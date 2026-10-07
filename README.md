@@ -70,7 +70,7 @@ The labels are friendlier than the API. This is what each one sets on the Router
 
 ## Updating the screenshots
 
-The images in `docs/` come from `scripts/screenshots.mjs`. Retake them with any UI change. The moodboard shot uses your first board with images, or a demo board built from recent images that is never saved.
+The images in `docs/` come from `scripts/screenshots.mjs`. Retake them with any UI change. The shots show the server's whole gallery, so run it against an `outputs/` folder that holds only images you're happy to publish. The moodboard shot uses your first board with images, or a demo board built from recent images that is never saved.
 
 ```sh
 npm i --no-save puppeteer-core     # once

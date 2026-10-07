@@ -5,6 +5,8 @@
 //   node scripts/screenshots.mjs [http://127.0.0.1:8765]
 //
 // Makes one real 4-image run at 1K (billed to your key) for the loading and feed shots.
+// The shots show whatever is in the server's outputs/ folder and go into a public README:
+// point it at a server whose gallery holds only images you are happy to publish.
 // Set CHROME to your Chrome/Chromium binary if it is not in the default macOS location.
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
