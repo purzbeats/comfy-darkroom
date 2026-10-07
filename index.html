@@ -54,47 +54,62 @@ body.drag::after { content:"Drop to add as reference images"; position:fixed; in
 /* ---------- settings panel ---------- */
 .panel { max-width:110rem; margin:1rem auto 0; padding:0 1.5rem; display:none; }
 .panel.open { display:block; }
-.panel-in { background:var(--t4); border-radius:2.25rem; padding:1.4rem 1.6rem 1.2rem; }
-.fields { display:flex; flex-wrap:wrap; gap:1.25rem 2rem; align-items:flex-start; }
+.panel-in { background:var(--t4); border-radius:2.25rem; padding:1.75rem 2rem 1.25rem; }
+/* One grid per section so labels, controls and hints line up across columns. */
+.basics { display:grid; grid-template-columns:minmax(16rem,22rem) auto auto; justify-content:start; gap:1.75rem 3rem; align-items:start; }
+.basics .f-shape { grid-column:1 / -1; }
+.adv { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:1.75rem 3rem; align-items:start; margin-top:1.5rem; }
+.adv .f-notes { grid-column:span 2; }
+@media (max-width:1100px){ .basics { grid-template-columns:1fr 1fr; } .basics .f-model { grid-column:1 / -1; } .adv { grid-template-columns:1fr 1fr; } .adv .f-notes { grid-column:1 / -1; } }
 .field { min-width:0; }
-.field.f-model { flex:1 1 240px; max-width:340px; }
-.field.f-shape { flex:3 1 460px; }
-.field.f-wide { flex:2 1 320px; }
-.field.f-narrow { flex:1 1 200px; }
-label.k, .k { display:flex; justify-content:space-between; align-items:baseline; gap:.5rem; font-size:.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin-bottom:.45rem; }
-.k .val { color:var(--warm-white); font-weight:400; letter-spacing:0; text-transform:none; font-size:.85rem; }
-.help { font-size:.82rem; font-weight:400; color:var(--muted); line-height:1.4; margin-top:.45rem; max-width:34rem; }
-select,input[type=number],input[type=text],textarea.in { width:100%; background:var(--ink-soft); color:var(--warm-white); border:1px solid var(--t20); border-radius:.75rem; font:inherit; font-weight:400; font-size:.95rem; padding:.55rem .75rem; outline:none; }
-textarea.in { resize:vertical; min-height:2.6rem; line-height:1.4; }
-select:focus,input:focus,textarea.in:focus { border-color:var(--canvas); }
-input::placeholder,textarea.in::placeholder { color:var(--muted); }
+label.k, .k { display:flex; align-items:baseline; gap:.6rem; height:1.15rem; line-height:1.15rem; font-size:.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin-bottom:.6rem; }
+.k.split { justify-content:space-between; }
+.k .val { color:var(--warm-white); font-weight:400; letter-spacing:0; text-transform:none; font-size:.875rem; line-height:1.15rem; }
+.help { font-size:.85rem; font-weight:400; color:var(--muted); line-height:1.45; margin-top:.6rem; max-width:30rem; }
+select,input[type=number],input[type=text] { width:100%; height:2.75rem; background:var(--ink-soft); color:var(--warm-white); border:1px solid var(--t20); border-radius:.75rem; font:inherit; font-weight:400; font-size:1rem; padding:0 .85rem; outline:none; }
+select:focus,input:focus { border-color:var(--canvas); }
+input::placeholder { color:var(--muted); }
 .seg { display:inline-flex; border:1px solid var(--t20); border-radius:.75rem; overflow:hidden; }
-.seg button { background:var(--ink-soft); color:var(--canvas); border:0; padding:.55rem .95rem; cursor:pointer; font-weight:700; font-size:.875rem; min-width:2.8rem; }
+.seg button { height:calc(2.75rem - 2px); background:var(--ink-soft); color:var(--canvas); border:0; padding:0 1.05rem; cursor:pointer; font-weight:700; font-size:.9rem; min-width:3rem; }
 .seg button + button { border-left:1px solid var(--t20); }
 .seg button:hover:not(.on):not(:disabled) { background:var(--t8); color:var(--warm-white); }
 .seg button.on { background:var(--warm-white); color:var(--ink); }
 .seg button:disabled { opacity:.4; cursor:not-allowed; }
-.shapes { display:flex; flex-wrap:wrap; gap:.4rem; }
-.shape { display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:.35rem; width:5.3rem; padding:.55rem .3rem .45rem; background:var(--ink-soft); border:1px solid var(--t20); border-radius:.75rem; color:var(--canvas); cursor:pointer; }
+/* Ten shapes on one line on desktop (10 x 5.4rem + gaps = 58.5rem); wraps evenly below that. */
+.shapes { display:grid; grid-template-columns:repeat(auto-fill, minmax(5.4rem, 1fr)); gap:.5rem; max-width:60rem; }
+.shape { display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:.3rem; padding:.65rem .3rem .55rem; background:var(--ink-soft); border:1px solid var(--t20); border-radius:.75rem; color:var(--canvas); cursor:pointer; }
 .shape:hover:not(.on) { background:var(--t8); color:var(--warm-white); }
 .shape.on { background:var(--warm-white); color:var(--ink); border-color:var(--warm-white); }
 .shape .box { height:28px; display:flex; align-items:center; justify-content:center; }
 .shape i { display:block; border:1.5px solid currentColor; border-radius:3px; }
 .shape i.auto { border-style:dashed; }
-.shape .n { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
-.shape .r { font-size:.72rem; font-weight:400; opacity:.75; margin-top:-.25rem; }
-.range { width:100%; accent-color:var(--canvas); margin:.2rem 0 0; }
-.ends { display:flex; justify-content:space-between; font-size:.75rem; font-weight:400; color:var(--muted); }
-.seedrow { display:flex; gap:.4rem; }
-.seedrow input { flex:1; }
-.more { margin-top:1.25rem; border-top:1px solid var(--t8); padding-top:1rem; }
-.more summary { list-style:none; cursor:pointer; display:inline-flex; align-items:center; gap:.5rem; font-size:.8rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--warm-white); }
+.shape .n { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; white-space:nowrap; }
+.shape .r { font-size:.75rem; font-weight:400; opacity:.8; }
+.range { width:100%; height:2.75rem; margin:0; accent-color:var(--canvas); }
+.ends { display:flex; justify-content:space-between; font-size:.78rem; font-weight:400; color:var(--muted); margin-top:-.35rem; }
+.seedrow { display:flex; gap:.5rem; max-width:24rem; }
+.seedrow input { flex:1; min-width:0; }
+.sidebtn { height:2.75rem; flex:none; padding:0 1rem; background:var(--ink-soft); border:1px solid var(--t20); border-radius:.75rem; color:var(--canvas); font-size:.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; cursor:pointer; }
+.sidebtn:hover { background:var(--t8); color:var(--warm-white); }
+.more { margin-top:1.75rem; border-top:1px solid var(--t8); padding-top:1.25rem; }
+.more summary { list-style:none; cursor:pointer; display:inline-flex; align-items:center; gap:.55rem; font-size:.8rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--warm-white); padding:.25rem 0; }
 .more summary::-webkit-details-marker { display:none; }
-.more summary .chev { transition:transform .15s; display:inline-block; }
-.more[open] summary .chev { transform:rotate(90deg); }
-.more summary .sub { color:var(--muted); font-weight:400; letter-spacing:0; text-transform:none; font-size:.85rem; }
-.more .fields { margin-top:1.1rem; }
-.panel-foot { display:flex; justify-content:space-between; align-items:center; margin-top:1rem; }
+.more summary svg { width:14px; height:14px; transition:transform .15s; }
+.more[open] summary svg { transform:rotate(90deg); }
+.more summary .sub { color:var(--muted); font-weight:400; letter-spacing:0; text-transform:none; font-size:.875rem; }
+.panel-foot { display:flex; justify-content:space-between; align-items:center; margin-top:1.5rem; padding-top:1rem; border-top:1px solid var(--t8); }
+
+/* responsive panel overrides: keep after the base rules above */
+@media (max-width:1100px){ .shapes { grid-template-columns:repeat(5, minmax(0, 1fr)); max-width:34rem; } }
+@media (max-width:640px){
+  .basics, .adv { grid-template-columns:1fr; } .panel-in { padding:1.25rem 1.1rem 1rem; border-radius:1.5rem; }
+  .seg { display:flex; width:100%; } .seg button { flex:1; min-width:0; padding:0 .4rem; }
+  /* one swipeable row of shapes instead of four ragged rows */
+  .shapes { display:flex; overflow-x:auto; scroll-snap-type:x proximity; max-width:none; margin:0 -1.1rem; padding:0 1.1rem .25rem; scrollbar-width:none; }
+  .shapes::-webkit-scrollbar { display:none; }
+  .shape { flex:none; width:5.4rem; scroll-snap-align:start; }
+  .bar { flex-wrap:wrap; } .prompt { flex:1 1 100%; } .go { flex:1 1 100%; }
+}
 
 /* ---------- feed ---------- */
 .feed { max-width:110rem; margin:0 auto; padding:1.5rem; display:flex; flex-direction:column; gap:2.25rem; }
@@ -203,7 +218,7 @@ kbd { font-family:inherit; font-size:.78rem; font-weight:700; color:var(--warm-w
 
 <div class="panel" id="panel">
   <div class="panel-in">
-    <div class="fields">
+    <div class="basics">
       <div class="field f-model">
         <label class="k" for="model">Model</label>
         <select id="model"></select>
@@ -226,24 +241,24 @@ kbd { font-family:inherit; font-size:.78rem; font-weight:700; color:var(--warm-w
     </div>
 
     <details class="more" id="more">
-      <summary><span class="chev">›</span> More controls <span class="sub" id="more-sub"></span></summary>
-      <div class="fields">
-        <div class="field f-wide">
-          <label class="k" for="temp">Creativity <span class="val" id="temp-val"></span></label>
+      <summary><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3l5 5-5 5"/></svg>More controls <span class="sub" id="more-sub"></span></summary>
+      <div class="adv">
+        <div class="field">
+          <label class="k split" for="temp">Creativity <span class="val" id="temp-val"></span></label>
           <input class="range" type="range" id="temp" min="0" max="2" step="0.05" value="1">
           <div class="ends"><span>Steady</span><span>Wild</span></div>
           <div class="help">Lower stays close to your words. Higher takes more liberties.</div>
         </div>
-        <div class="field f-wide">
+        <div class="field">
           <div class="k">Planning</div>
           <div class="seg" id="think"></div>
-          <div class="help">How much the model thinks before drawing. Careful handles long, detailed prompts better but takes longer.</div>
+          <div class="help">How much the model thinks before drawing. Careful suits long, detailed prompts but takes longer.</div>
         </div>
-        <div class="field f-narrow">
+        <div class="field">
           <label class="k" for="seed">Seed</label>
           <div class="seedrow">
             <input type="number" id="seed" placeholder="Random" min="0">
-            <button class="btn quiet" id="seed-new" title="Pick a random seed"><span class="tc">Pick</span></button>
+            <button class="sidebtn" id="seed-new" title="Pick a random seed"><span class="tc">Pick</span></button>
           </div>
           <div class="help">Leave empty for fresh results. Reuse a seed with the same settings to get close to the same image.</div>
         </div>
@@ -252,10 +267,10 @@ kbd { font-family:inherit; font-size:.78rem; font-weight:700; color:var(--warm-w
           <div class="seg" id="fmt"></div>
           <div class="help">PNG keeps every detail. JPEG is smaller.</div>
         </div>
-        <div class="field f-wide">
+        <div class="field f-notes">
           <label class="k" for="sys">Style notes</label>
-          <textarea class="in" id="sys" rows="1" placeholder="e.g. soft film grain, muted colours, no text"></textarea>
-          <div class="help">Applied to every image until you clear it.</div>
+          <input type="text" id="sys" placeholder="e.g. soft film grain, muted colours, no text">
+          <div class="help">Added to every image until you clear it.</div>
         </div>
       </div>
     </details>

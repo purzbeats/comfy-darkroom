@@ -52,6 +52,18 @@ The labels are friendlier than the API. This is what each one sets on the Router
 | File type | `imageConfig.imageOutputOptions.mimeType` |
 | Style notes | `systemInstruction` |
 
+## Updating the screenshots
+
+The images in `docs/` come from `scripts/screenshots.mjs`. Retake them with any UI change:
+
+```sh
+npm i --no-save puppeteer-core     # once
+python3 server.py &                # needs a working key
+node scripts/screenshots.mjs       # makes one 4-image run at 1K
+```
+
+Set `CHROME` if Chrome isn't at the default macOS path.
+
 ## Notes
 
 - Planning level `LOW` is not offered: Router rejects it for Nano Banana 2.1.
