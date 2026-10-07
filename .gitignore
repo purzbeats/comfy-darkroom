@@ -1,5 +1,6 @@
 .env
 outputs/
+moodboards/
 __pycache__/
 *.pyc
 .DS_Store

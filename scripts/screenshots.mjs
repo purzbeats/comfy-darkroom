@@ -66,6 +66,44 @@ const open = async (w, h) => {
   await p.close();
 }
 
+// 4. Organize with a few images selected.
+{
+  const p = await open(1900, 1150);
+  await p.goto(base + '/#organize', { waitUntil: 'networkidle0' });
+  await sleep(600);
+  const tiles = await p.$$('#org-grid .tile');
+  for (const t of tiles.slice(0, 5)) await t.click();
+  await p.mouse.move(5, 1140);
+  await sleep(300);
+  await p.screenshot({ path: path.join(docs, 'organize.png') });
+  await p.close();
+}
+
+// 5. A moodboard's page. Uses the first real board; with none, shows a demo board (never saved).
+{
+  const p = await open(1900, 1150);
+  await p.setRequestInterception(true);
+  let demo = false;
+  p.on('request', async r => {
+    if (!r.url().endsWith('/api/moodboards') || r.method() !== 'GET') return r.continue();
+    const real = await (await fetch(r.url())).json();
+    if (real.some(b => b.items.length)) return r.respond({ contentType: 'application/json', body: JSON.stringify(real) });
+    demo = true;
+    const items = (await (await fetch(base + '/api/gallery')).json()).slice(0, 12).map(i => 'outputs/' + i.file);
+    r.respond({ contentType: 'application/json', body: JSON.stringify([{ id: 'demo', name: 'Studio picks', items }]) });
+  });
+  await p.goto(base, { waitUntil: 'networkidle0' });
+  const id = await p.evaluate(() => state.boards.find(b => b.items.length)?.id);
+  if (id) {
+    await p.evaluate(id => go('moodboards/' + id), id);
+    await sleep(800);
+    await p.mouse.move(5, 1140);
+    await p.screenshot({ path: path.join(docs, 'moodboard.png') });
+  } else errors.push('no images available for the moodboard shot');
+  if (demo) console.log('Moodboard shot used a demo board (no real boards with images).');
+  await p.close();
+}
+
 await browser.close();
 if (errors.length) { console.error('Problems:\n' + errors.join('\n')); process.exit(1); }
-console.log('Updated docs/welcome.png, docs/loading.png and docs/feed.png');
+console.log('Updated docs/welcome.png, loading.png, feed.png, organize.png and moodboard.png');

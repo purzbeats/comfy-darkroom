@@ -196,18 +196,96 @@ kbd { font-family:inherit; font-size:.78rem; font-weight:700; color:var(--warm-w
 /* toast */
 .toast { position:fixed; left:50%; bottom:1.5rem; transform:translate(-50%,1rem); background:var(--warm-white); color:var(--ink); font-weight:400; font-size:.95rem; border-radius:1rem; padding:.7rem 1.1rem; opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; z-index:50; max-width:90vw; }
 .toast.show { opacity:1; transform:translate(-50%,0); }
+
+/* ---------- tabs + views ---------- */
+.tabs { display:flex; gap:.2rem; }
+.tab { background:none; border:0; color:var(--muted); font-size:.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; padding:0 .75rem; height:2.3rem; border-radius:.75rem; cursor:pointer; white-space:nowrap; }
+.tab:hover { color:var(--warm-white); background:var(--t8); }
+.tab.on { color:var(--warm-white); background:var(--t8); }
+.view[hidden] { display:none !important; }
+@media (max-width:900px){ .bar { flex-wrap:wrap; } .tabs { order:-1; flex:1 1 100%; } }
+#moodlbl { max-width:12rem; overflow:hidden; text-overflow:ellipsis; }
+#moodbtn.on { color:var(--warm-white); }
+/* Give the prompt room: below 1700px the bar buttons go icon-only, except a chosen moodboard's name. */
+@media (max-width:1700px){ #addimg .lbl-long, #toggle .lbl-long, #moodbtn:not(.on) .lbl-long { display:none; } }
+@media (max-width:900px){ #moodbtn.on .lbl-long { display:none; } }
+
+/* ---------- menu ---------- */
+.menu { position:fixed; z-index:60; min-width:16rem; max-width:21rem; max-height:60vh; overflow:auto; background:var(--ink-light); border:1px solid var(--t20); border-radius:1rem; padding:.4rem; }
+.menu .mh { font-size:.7rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); padding:.45rem .65rem .3rem; }
+.menu .mi { display:flex; width:100%; align-items:center; gap:.65rem; text-align:left; background:none; border:0; color:var(--canvas); padding:.45rem .6rem; border-radius:.65rem; cursor:pointer; font-weight:400; font-size:.95rem; }
+.menu .mi:hover, .menu .mi.on { background:var(--t8); color:var(--warm-white); }
+.menu .mi > span:not(.c):not(.cv) { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.menu .mi .c { margin-left:auto; color:var(--muted); font-size:.82rem; }
+.menu .mi img, .menu .mi .cv { width:30px; height:30px; flex:none; border-radius:.45rem; object-fit:cover; background:var(--ink-soft); border:1px dashed var(--t20); }
+.menu .mi img { border:0; }
+.menu .sep { height:1px; background:var(--t8); margin:.35rem .2rem; }
+.menu input { height:2.5rem; margin:.15rem 0 .1rem; }
+
+/* ---------- organize + moodboards ---------- */
+.page { max-width:110rem; margin:0 auto; padding:1.5rem 1.5rem 7rem; }
+.page-head { display:flex; align-items:flex-end; justify-content:space-between; gap:1rem 2rem; flex-wrap:wrap; margin:.5rem 0 1.5rem; }
+.page-head h2 { font-weight:300; font-size:clamp(1.9rem,3.2vw,2.6rem); letter-spacing:-.025em; margin:0; color:var(--canvas); }
+.page-head .sub { font-size:.95rem; font-weight:400; color:var(--muted); margin-top:.4rem; max-width:40rem; line-height:1.45; }
+.page-tools { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
+.page-tools input { width:16rem; }
+.page-tools .btn { height:2.75rem; }
+.org-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(170px, 1fr)); gap:6px; }
+.tile { position:relative; aspect-ratio:1; border-radius:.75rem; overflow:hidden; background:var(--ink-soft); cursor:pointer; user-select:none; }
+.tile img { width:100%; height:100%; object-fit:cover; display:block; }
+.tile .tick { position:absolute; top:.55rem; left:.55rem; width:24px; height:24px; border-radius:50%; border:1.5px solid rgba(255,255,255,.9); background:rgba(20,14,24,.45); opacity:0; transition:opacity .12s; display:flex; align-items:center; justify-content:center; }
+.tile:hover .tick, .org-grid.selecting .tick { opacity:1; }
+.tile.sel .tick { background:var(--warm-white); border-color:var(--warm-white); opacity:1; }
+.tile.sel .tick::after { content:''; width:10px; height:5px; border-left:2px solid var(--ink); border-bottom:2px solid var(--ink); transform:translateY(-1px) rotate(-45deg); }
+.tile.sel::after { content:''; position:absolute; inset:0; border:3px solid var(--warm-white); border-radius:.75rem; pointer-events:none; }
+.tile .zoom, .tile .rm { position:absolute; top:.45rem; right:.45rem; width:30px; height:30px; border-radius:.6rem; border:1px solid var(--t20); background:rgba(20,14,24,.8); color:var(--warm-white); cursor:pointer; opacity:0; transition:opacity .12s; font-size:15px; line-height:1; padding:0; }
+.tile:hover .zoom, .tile:hover .rm { opacity:1; }
+@media (hover:none){ .tile .zoom, .tile .rm, .tile .tick { opacity:1; } }
+.tile .zoom:hover, .tile .rm:hover { background:var(--warm-white); color:var(--ink); }
+.selbar { position:fixed; left:50%; bottom:1.25rem; transform:translateX(-50%); z-index:20; display:flex; gap:.5rem; align-items:center; background:var(--ink-light); border:1px solid var(--t20); border-radius:1.25rem; padding:.5rem .5rem .5rem 1.15rem; max-width:calc(100vw - 2rem); }
+.selbar[hidden] { display:none; }
+.selbar .n { font-weight:400; color:var(--warm-white); margin-right:.4rem; white-space:nowrap; }
+.empty-note { text-align:center; padding:4.5rem 1rem; color:var(--muted); font-weight:400; max-width:34rem; margin:0 auto; line-height:1.55; }
+.empty-note h3 { font-weight:300; font-size:1.8rem; letter-spacing:-.02em; color:var(--canvas); margin:0 0 .6rem; }
+.empty-note b { color:var(--warm-white); font-weight:400; }
+.boards { display:grid; grid-template-columns:repeat(auto-fill, minmax(270px, 1fr)); gap:1rem; }
+.board { background:var(--t4); border-radius:2.5rem; padding:8px; cursor:pointer; border:0; text-align:left; color:inherit; font:inherit; }
+.board:hover { background:var(--t8); }
+.board .cover { aspect-ratio:4/3; border-radius:2rem; overflow:hidden; display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; gap:3px; background:var(--ink-soft); }
+.board .cover img { width:100%; height:100%; object-fit:cover; display:block; min-height:0; }
+.board .cover.n1 img { grid-area:1 / 1 / 3 / 3; }
+.board .cover.n2 img { grid-row:1 / 3; }
+.board .cover.n3 img:first-child { grid-row:1 / 3; }
+.board .bm { padding:.85rem 1.1rem .75rem; display:flex; justify-content:space-between; align-items:center; gap:.75rem; }
+.board .bn { color:var(--warm-white); font-weight:400; font-size:1.05rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.board .bc { color:var(--muted); font-size:.88rem; font-weight:400; display:flex; align-items:center; gap:.5rem; white-space:nowrap; }
+.dot.on { background:var(--pass); }
+.bname { font:inherit; font-weight:300; font-size:clamp(1.9rem,3.2vw,2.6rem); letter-spacing:-.025em; color:var(--canvas); background:none; border:0; border-bottom:1px solid transparent; padding:0; height:auto; width:min(36rem, 80vw); outline:none; border-radius:0; }
+.bname:hover, .bname:focus { border-bottom-color:var(--t20); }
+.back { display:block; margin:0 0 .5rem -.2rem; }
+@media (max-width:640px){ .page { padding:1rem 1rem 7rem; } .page-tools input { width:100%; } .org-grid { grid-template-columns:repeat(3, 1fr); gap:4px; } }
+body.drag[data-drop="board"]::after { content:"Drop to add to this moodboard"; }
 </style>
 </head>
 <body>
 <div class="top">
   <div class="bar">
     <div class="brand">Comfy Darkroom</div>
+    <nav class="tabs" id="tabs" aria-label="Sections">
+      <button class="tab on" data-view="create"><span class="tc">Create</span></button>
+      <button class="tab" data-view="organize"><span class="tc">Organize</span></button>
+      <button class="tab" data-view="moodboards"><span class="tc">Moodboards</span></button>
+    </nav>
     <div class="prompt">
       <textarea id="prompt" rows="1" placeholder="Describe an image" aria-label="Prompt"></textarea>
       <button class="ib" id="addimg" title="Add reference images (or drag them anywhere, or paste)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-9 9"/></svg>
         <span class="tc lbl-long">References</span>
         <span class="badge" id="imgcount" hidden>0</span>
+      </button>
+      <button class="ib" id="moodbtn" title="Generate in the style of a moodboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg>
+        <span class="tc lbl-long" id="moodlbl">Moodboard</span>
       </button>
       <button class="ib" id="toggle" title="Settings" aria-expanded="false" aria-controls="panel">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
@@ -286,6 +364,7 @@ kbd { font-family:inherit; font-size:.78rem; font-weight:700; color:var(--warm-w
   </div>
 </div>
 
+<div class="view" id="view-create">
 <div class="welcome" id="empty" hidden>
   <h2>Develop your first image</h2>
   <p class="lede">Describe a picture and press Enter. Each prompt makes a row of images, with the settings beside them so you can run it again or build on a result.</p>
@@ -296,11 +375,35 @@ kbd { font-family:inherit; font-size:.78rem; font-weight:700; color:var(--warm-w
     <div class="tip"><b>Edit a photo.</b> Drop images anywhere on the page, then describe the change.</div>
     <div class="tip"><b>Combine images.</b> Refer to them by number: “put the jacket from image 2 on the person in image 1”.</div>
     <div class="tip"><b>Build on a result.</b> Hover an image and pick Edit or Variations.</div>
+    <div class="tip"><b>Set a style.</b> Collect images in a moodboard, then pick it next to the prompt.</div>
     <div class="tip"><kbd>Enter</kbd> generates. <kbd>Shift</kbd>+<kbd>Enter</kbd> adds a new line.</div>
   </div>
 </div>
 
 <div class="feed" id="feed"></div>
+</div>
+
+<div class="view page" id="view-organize" hidden>
+  <div class="page-head">
+    <div><h2>Organize</h2><div class="sub" id="org-sub"></div></div>
+    <div class="page-tools" id="org-tools">
+      <input type="text" id="org-q" placeholder="Search prompts" aria-label="Search prompts">
+      <button class="btn" id="org-all"><span class="tc">Select all</span></button>
+    </div>
+  </div>
+  <div class="org-grid" id="org-grid"></div>
+  <div class="empty-note" id="org-empty" hidden><h3>Nothing here yet</h3>Everything you generate lands here, ready to sort into moodboards.</div>
+</div>
+
+<div class="view page" id="view-moodboards" hidden></div>
+
+<div class="selbar" id="selbar" hidden>
+  <span class="n" id="seln"></span>
+  <button class="btn" id="sel-mood"><span class="tc">Add to moodboard</span></button>
+  <button class="btn quiet" id="sel-del"><span class="tc">Delete</span></button>
+  <button class="btn quiet" id="sel-clear"><span class="tc">Clear</span></button>
+</div>
+<input type="file" id="mbfile" accept="image/*" multiple hidden>
 
 <div class="lb" id="lb" role="dialog" aria-modal="true" aria-label="Image viewer">
   <div class="stage" id="lbstage">
@@ -312,6 +415,7 @@ kbd { font-family:inherit; font-size:.78rem; font-weight:700; color:var(--warm-w
     <div class="p" id="lbp"></div>
     <div class="acts">
       <button class="btn" id="lbedit"><span class="tc">Edit</span></button>
+      <button class="btn" id="lbmood" data-menu-anchor><span class="tc">+ Moodboard</span></button>
       <a class="btn" id="lbdl" download><span class="tc">Download</span></a>
       <button class="btn" id="lbx"><span class="tc">Close</span></button>
     </div>
@@ -354,7 +458,7 @@ const planningName = v => (PLANNING.find(p => p[0] === (v || '')) || [, v.charAt
 
 // ---------- settings ----------
 const DEFAULTS = { model: 'vertexai/gemini-nano-banana-2.1', runs: 4, ar: '16:9', size: '2K', fmt: 'image/png', seed: '', think: '', temp: 1, sys: '' };
-const state = { inputs: [], jobs: [], models: {}, S: { ...DEFAULTS } };
+const state = { inputs: [], jobs: [], models: {}, S: { ...DEFAULTS }, boards: [], activeBoard: null, view: 'create', boardOpen: null };
 const S = () => state.S;
 function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(state.S)); } catch {} }
 function load() {
@@ -447,11 +551,13 @@ let dragDepth = 0;
 document.addEventListener('dragenter', e => { if (e.dataTransfer.types.includes('Files')) { dragDepth++; document.body.classList.add('drag'); } });
 document.addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; document.body.classList.remove('drag'); } });
 document.addEventListener('dragover', e => e.preventDefault());
-document.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; document.body.classList.remove('drag'); addFiles(e.dataTransfer.files); });
-document.addEventListener('paste', e => { const fs = [...e.clipboardData.files]; if (fs.length) { e.preventDefault(); addFiles(fs); } });
+function takeFiles(files) { if (state.boardOpen) uploadToBoard(state.boardOpen, files); else addFiles(files); }
+document.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; document.body.classList.remove('drag'); takeFiles(e.dataTransfer.files); });
+document.addEventListener('paste', e => { const fs = [...e.clipboardData.files]; if (fs.length && !e.target.closest('input')) { e.preventDefault(); takeFiles(fs); } });
 async function useAsInput(file) {
   const blob = await (await fetch('/outputs/' + file)).blob();
   addFiles([new File([blob], file, { type: blob.type })], true);
+  if (state.view !== 'create') go('create');
   window.scrollTo({ top: 0, behavior: 'smooth' });
   ta.focus();
 }
@@ -467,20 +573,30 @@ function requestFrom(s, prompt) {
   return { prompt, model: s.model, aspectRatio: s.ar, imageSize: s.size, mimeType: s.fmt, temperature: +s.temp,
     thinkingLevel: s.think || undefined, system: s.sys.trim() || undefined, seed: s.seed };
 }
-function generate(req = requestFrom(state.S, ta.value.trim()), inputs = state.inputs, runs = state.S.runs) {
+async function generate(req = requestFrom(state.S, ta.value.trim()), inputs = state.inputs, runs = state.S.runs, boardId = state.activeBoard) {
   if (!req.prompt) { ta.focus(); toast('Describe the image first.'); return; }
+  const board = boardById(boardId)?.items.length ? boardById(boardId) : null;
   const baseSeed = req.seed === '' || req.seed == null ? Math.floor(Math.random() * 2147483000) : +req.seed;
   const jobId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-  const images = inputs.map(({ mime, data }) => ({ mime, data }));
-  const job = { jobId, settings: { ...req, seed: baseSeed, inputCount: images.length }, refs: inputs.map(i => i.url), created: Date.now() / 1000, slots: [] };
-  for (let i = 0; i < runs; i++) {
-    const slot = { run: i, seed: baseSeed + i, status: 'pending', req: { ...req, seed: baseSeed + i, jobId, run: i, runs, images } };
-    job.slots.push(slot);
-    runSlot(slot);   // all runs fire at once; the server is threaded, so they hit Router in parallel
-  }
+  const own = inputs.map(({ mime, data }) => ({ mime, data }));
+  const mood = board ? { id: board.id, name: board.name, count: board.items.length } : undefined;
+  const job = { jobId, settings: { ...req, seed: baseSeed, inputCount: own.length, moodboard: mood }, refs: inputs.map(i => i.url), created: Date.now() / 1000, slots: [] };
+  for (let i = 0; i < runs; i++) job.slots.push({ run: i, seed: baseSeed + i, status: 'pending', started: Date.now() });
   state.jobs.unshift(job);
+  if (state.view !== 'create') go('create');
   render();
   window.scrollTo({ top: 0, behavior: 'smooth' });
+  let sheets = [];
+  if (board) {
+    try { sheets = await moodboardSheets(board); } catch { sheets = []; }
+    if (!sheets.length) { toast(`Couldn’t read the ${board.name} images. Generating without it.`); job.settings.moodboard = undefined; render(); }
+  }
+  const images = [...own, ...sheets];
+  const moodReq = sheets.length ? { ...mood, sheets: sheets.length } : undefined;
+  job.slots.forEach((slot, i) => {
+    slot.req = { ...req, seed: baseSeed + i, jobId, run: i, runs, images, moodboard: moodReq, inputCount: undefined };
+    runSlot(slot);   // all runs fire at once; the server is threaded, so they hit Router in parallel
+  });
 }
 function runSlot(slot) {
   Object.assign(slot, { status: 'pending', started: Date.now(), error: null });
@@ -510,6 +626,277 @@ function friendlyError(res) {
 
 let toastTimer = 0;
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2800); }
+
+
+// ---------- views ----------
+const VIEWS = ['create', 'organize', 'moodboards'];
+function route() {
+  const [v, id] = (location.hash.slice(1) || 'create').split('/');
+  state.view = VIEWS.includes(v) ? v : 'create';
+  state.boardOpen = state.view === 'moodboards' ? (id || null) : null;
+  VIEWS.forEach(x => { $('#view-' + x).hidden = x !== state.view; });
+  $('#tabs').querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.view === state.view));
+  if (state.view !== 'organize') clearSelection();
+  if (state.view === 'organize') renderOrganize();
+  if (state.view === 'moodboards') renderBoards();
+  document.body.dataset.drop = state.boardOpen ? 'board' : '';
+}
+function go(h) { if (location.hash.slice(1) !== h) location.hash = h; else route(); window.scrollTo(0, 0); }
+window.addEventListener('hashchange', route);
+$('#tabs').onclick = e => { const t = e.target.closest('.tab'); if (t) go(t.dataset.view); };
+
+// ---------- menu ----------
+let menuEl = null;
+function closeMenu() { menuEl?.remove(); menuEl = null; }
+function openMenu(anchor, build) {
+  closeMenu();
+  menuEl = document.createElement('div'); menuEl.className = 'menu'; menuEl.setAttribute('role', 'menu');
+  document.body.appendChild(menuEl); build(menuEl);
+  const r = anchor.getBoundingClientRect(), w = menuEl.offsetWidth, h = menuEl.offsetHeight;
+  let top = r.bottom + 6; if (top + h > innerHeight - 8) top = Math.max(8, r.top - h - 6);
+  menuEl.style.left = Math.max(8, Math.min(r.left, innerWidth - w - 8)) + 'px';
+  menuEl.style.top = top + 'px';
+}
+document.addEventListener('mousedown', e => { if (menuEl && !menuEl.contains(e.target) && !e.target.closest('[data-menu-anchor]')) closeMenu(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); });
+window.addEventListener('scroll', closeMenu, { passive: true });
+
+// ---------- moodboards ----------
+// A moodboard is a named set of images. Generating with one packs its images into grid sheets
+// (up to 6 images a sheet, up to 6 sheets) and sends them after the user's own references; the
+// server adds a note telling the model to read them as art direction. The UI only shows the board.
+const BOARD_KEY = 'darkroom-moodboard';
+const src2url = src => '/' + src;
+const boardById = id => state.boards.find(b => b.id === id);
+const coverImg = b => b.items[0] ? `<img src="${src2url(b.items[0])}" alt="">` : '<span class="cv"></span>';
+async function api(path, body, method = 'POST') {
+  const r = await fetch(path, { method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  const res = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(res.error || `HTTP ${r.status}`);
+  return res;
+}
+function upsertBoard(b) { const i = state.boards.findIndex(x => x.id === b.id); if (i < 0) state.boards.push(b); else state.boards[i] = b; syncMoodButton(); return b; }
+const createBoard = (name, add = []) => api('/api/moodboards', { name, add }).then(upsertBoard);
+const updateBoard = (id, body) => api('/api/moodboards/' + id, body).then(upsertBoard);
+async function deleteBoard(id) {
+  await api('/api/moodboards/' + id, null, 'DELETE');
+  state.boards = state.boards.filter(b => b.id !== id);
+  if (state.activeBoard === id) setActiveBoard(null);
+}
+async function uploadToBoard(id, files) {
+  const list = [...files].filter(f => f.type.startsWith('image/'));
+  if (!list.length) return;
+  const images = await Promise.all(list.map(async f => ({ mime: f.type, data: (await asDataUrl(f)).split(',')[1] })));
+  try { const b = await api(`/api/moodboards/${id}/upload`, { images }).then(upsertBoard); toast(`Added ${list.length === 1 ? '1 image' : list.length + ' images'} to ${b.name}.`); }
+  catch (err) { toast('Couldn’t add those images: ' + err.message); }
+  renderBoards();
+}
+async function addImagesTo(srcs, id, newName) {
+  try {
+    const b = id ? await updateBoard(id, { add: srcs }) : await createBoard(newName, srcs);
+    toast(`Added ${srcs.length === 1 ? '1 image' : srcs.length + ' images'} to ${b.name}.`);
+    if (state.view === 'moodboards') renderBoards();
+  } catch (err) { toast('Couldn’t update the moodboard: ' + err.message); }
+}
+function setActiveBoard(id) {
+  state.activeBoard = id || null;
+  try { id ? localStorage.setItem(BOARD_KEY, id) : localStorage.removeItem(BOARD_KEY); } catch {}
+  syncMoodButton();
+}
+function syncMoodButton() {
+  const b = boardById(state.activeBoard);
+  $('#moodbtn').classList.toggle('on', !!b);
+  $('#moodlbl').textContent = b ? b.name : 'Moodboard';
+  $('#moodbtn').title = b ? `New images follow the ${b.name} moodboard. Click to change.` : 'Generate in the style of a moodboard';
+}
+// Pick a board to add images to, or type a name to start a new one.
+function pickBoard(anchor, onPick) {
+  openMenu(anchor, m => {
+    m.innerHTML = `<div class="mh">Add to moodboard</div>` +
+      state.boards.map(b => `<button class="mi" data-id="${b.id}">${coverImg(b)}<span>${esc(b.name)}</span><span class="c">${b.items.length}</span></button>`).join('') +
+      (state.boards.length ? '<div class="sep"></div>' : '') +
+      `<input type="text" placeholder="New moodboard name, then Enter" aria-label="New moodboard name">`;
+    m.onclick = e => { const b = e.target.closest('.mi'); if (b) { closeMenu(); onPick(b.dataset.id); } };
+    const inp = m.querySelector('input');
+    inp.onkeydown = e => { if (e.key === 'Enter' && inp.value.trim()) { const name = inp.value.trim(); closeMenu(); onPick(null, name); } };
+    if (!state.boards.length) setTimeout(() => inp.focus());
+  });
+}
+$('#moodbtn').dataset.menuAnchor = '';
+$('#moodbtn').onclick = () => {
+  if (menuEl) return closeMenu();
+  openMenu($('#moodbtn'), m => {
+    const usable = state.boards.filter(b => b.items.length);
+    m.innerHTML = `<div class="mh">Generate in the style of</div>
+      <button class="mi ${state.activeBoard ? '' : 'on'}" data-id=""><span class="cv"></span><span>No moodboard</span></button>` +
+      usable.map(b => `<button class="mi ${b.id === state.activeBoard ? 'on' : ''}" data-id="${b.id}">${coverImg(b)}<span>${esc(b.name)}</span><span class="c">${b.items.length}</span></button>`).join('') +
+      `<div class="sep"></div><button class="mi" data-go="1"><span>${state.boards.length ? 'Manage moodboards' : 'Make a moodboard'}</span></button>`;
+    m.onclick = e => {
+      const b = e.target.closest('.mi'); if (!b) return;
+      closeMenu();
+      if (b.dataset.go) return go('moodboards');
+      setActiveBoard(b.dataset.id);
+      if (b.dataset.id) toast(`New images will follow ${boardById(b.dataset.id).name}.`);
+    };
+  });
+};
+
+// Sheets: spread the board's images evenly over the fewest sheets (30 -> 5 x 6, 25 -> 5 x 5, 7 -> 4 + 3).
+const SHEET_MAX = 6, SHEETS_MAX = 6, CELL = 512, GAP = 8;
+function planSheets(items) {
+  let list = items;
+  const cap = SHEET_MAX * SHEETS_MAX;
+  if (list.length > cap) { const stepBy = list.length / cap; list = Array.from({ length: cap }, (_, i) => items[Math.floor(i * stepBy)]); }
+  const count = Math.ceil(list.length / SHEET_MAX), out = [];
+  for (let i = 0, start = 0; i < count; i++) { const size = Math.ceil((list.length - start) / (count - i)); out.push(list.slice(start, start + size)); start += size; }
+  return out;
+}
+const loadImg = src => new Promise(ok => { const im = new Image(); im.onload = () => ok(im); im.onerror = () => ok(null); im.src = src; });
+async function drawSheet(srcs) {
+  const imgs = (await Promise.all(srcs.map(s => loadImg(src2url(s))))).filter(Boolean);
+  if (!imgs.length) return null;
+  const n = imgs.length, cols = n === 4 ? 2 : Math.min(3, n), rows = Math.ceil(n / cols);
+  const c = document.createElement('canvas');
+  c.width = cols * CELL + (cols + 1) * GAP; c.height = rows * CELL + (rows + 1) * GAP;
+  const ctx = c.getContext('2d'); ctx.fillStyle = '#111'; ctx.fillRect(0, 0, c.width, c.height);
+  imgs.forEach((im, i) => {   // cover-fit each image into its square cell
+    const scale = Math.max(CELL / im.naturalWidth, CELL / im.naturalHeight), sw = CELL / scale, sh = CELL / scale;
+    ctx.drawImage(im, (im.naturalWidth - sw) / 2, (im.naturalHeight - sh) / 2, sw, sh,
+      GAP + (i % cols) * (CELL + GAP), GAP + Math.floor(i / cols) * (CELL + GAP), CELL, CELL);
+  });
+  return { mime: 'image/jpeg', data: c.toDataURL('image/jpeg', 0.9).split(',')[1] };
+}
+const sheetCache = new Map();
+function moodboardSheets(board) {
+  const key = board.id + '|' + board.items.join(',');
+  if (!sheetCache.has(key)) sheetCache.set(key, Promise.all(planSheets(board.items).map(drawSheet)).then(s => s.filter(Boolean)));
+  return sheetCache.get(key);
+}
+
+function boardCard(b) {
+  const imgs = b.items.slice(0, 4);
+  return `<button class="board" data-id="${b.id}">
+    <div class="cover n${imgs.length}">${imgs.map(i => `<img loading="lazy" src="${src2url(i)}" alt="">`).join('')}</div>
+    <div class="bm"><span class="bn">${esc(b.name)}</span><span class="bc">${state.activeBoard === b.id ? '<span class="pill"><span class="dot on"></span><span class="tc">In use</span></span>' : ''}${b.items.length} image${b.items.length === 1 ? '' : 's'}</span></div></button>`;
+}
+function renderBoards() {
+  const el = $('#view-moodboards'), b = state.boardOpen && boardById(state.boardOpen);
+  if (state.boardOpen && !b) return go('moodboards');
+  if (!b) {
+    el.innerHTML = `<div class="page-head"><div><h2>Moodboards</h2>
+        <div class="sub">Collect images that share a feel. Pick a moodboard next to the prompt and new images follow its style.</div></div>
+      <div class="page-tools"><button class="btn" id="mb-new"><span class="tc">New moodboard</span></button></div></div>` +
+      (state.boards.length ? `<div class="boards">${state.boards.map(boardCard).join('')}</div>`
+        : `<div class="empty-note"><h3>No moodboards yet</h3>Start one here, then add images from <b>Organize</b>, from any result with <b>+ Moodboard</b>, or by dropping in your own.</div>`);
+    return;
+  }
+  const using = state.activeBoard === b.id;
+  el.innerHTML = `<div class="page-head"><div>
+      <button class="linkbtn back" data-go="moodboards"><span class="tc">‹ All moodboards</span></button>
+      <input class="bname" id="mb-name" value="${esc(b.name)}" aria-label="Moodboard name" maxlength="80">
+      <div class="sub">${b.items.length} image${b.items.length === 1 ? '' : 's'}${using ? ' · New images follow this moodboard' : ''}</div></div>
+    <div class="page-tools">
+      <button class="btn" id="mb-use"${b.items.length ? '' : ' disabled'}><span class="tc">${using ? 'Stop using' : 'Generate with this'}</span></button>
+      <button class="btn" id="mb-add"><span class="tc">Add images</span></button>
+      <button class="btn quiet" id="mb-del"><span class="tc">Delete</span></button></div></div>` +
+    (b.items.length ? `<div class="org-grid">${b.items.map(i => `<div class="tile" data-src="${esc(i)}"><img loading="lazy" src="${src2url(i)}" alt=""><button class="rm" title="Remove from moodboard" aria-label="Remove from moodboard">×</button></div>`).join('')}</div>`
+      : `<div class="empty-note"><h3>This moodboard is empty</h3>Drop images here, use <b>Add images</b>, or select some in <b>Organize</b>.</div>`);
+}
+$('#view-moodboards').onclick = async e => {
+  const t = e.target, b = boardById(state.boardOpen);
+  if (t.closest('[data-go]')) return go(t.closest('[data-go]').dataset.go);
+  const card = t.closest('.board'); if (card) return go('moodboards/' + card.dataset.id);
+  if (t.closest('#mb-new')) { const nb = await createBoard('New moodboard'); go('moodboards/' + nb.id); setTimeout(() => { $('#mb-name')?.focus(); $('#mb-name')?.select(); }, 50); return; }
+  if (!b) return;
+  if (t.closest('#mb-use')) {
+    if (state.activeBoard === b.id) { setActiveBoard(null); return renderBoards(); }
+    setActiveBoard(b.id); go('create'); ta.focus(); toast(`New images will follow ${b.name}. Describe what to make.`); return;
+  }
+  if (t.closest('#mb-add')) return $('#mbfile').click();
+  if (t.closest('#mb-del')) {
+    if (!confirm(`Delete the moodboard “${b.name}”? Your generated images stay in Organize.`)) return;
+    await deleteBoard(b.id); return go('moodboards');
+  }
+  const rm = t.closest('.rm');
+  if (rm) { await updateBoard(b.id, { remove: [rm.closest('.tile').dataset.src] }); renderBoards(); }
+};
+$('#view-moodboards').addEventListener('change', e => { if (e.target.id === 'mb-name') renameOpen(e.target.value); });
+$('#view-moodboards').addEventListener('keydown', e => { if (e.target.id === 'mb-name' && e.key === 'Enter') e.target.blur(); });
+async function renameOpen(name) {
+  if (!name.trim() || !state.boardOpen) return renderBoards();
+  await updateBoard(state.boardOpen, { name }); syncMoodButton();
+}
+$('#mbfile').onchange = e => { if (state.boardOpen) uploadToBoard(state.boardOpen, e.target.files); e.target.value = ''; };
+
+// ---------- organize ----------
+state.sel = new Set();
+let lastPicked = -1;
+const orgItems = () => { const q = $('#org-q').value.trim().toLowerCase(); return doneSlots().filter(s => !q || (s.item.settings?.prompt || '').toLowerCase().includes(q)); };
+function renderOrganize() {
+  const items = orgItems(), total = doneSlots().length;
+  $('#org-sub').textContent = total ? `${total} image${total === 1 ? '' : 's'}. Select some to add them to a moodboard.` : '';
+  $('#org-empty').hidden = total > 0;
+  $('#org-tools').hidden = !total;
+  $('#org-grid').innerHTML = items.map(s => `<div class="tile ${state.sel.has(s.item.file) ? 'sel' : ''}" data-f="${s.item.file}" title="${esc(s.item.settings?.prompt || '')}">
+    <img loading="lazy" src="/outputs/${s.item.file}" alt=""><span class="tick"></span><button class="zoom" aria-label="View larger" title="View larger">⤢</button></div>`).join('');
+  syncSelbar();
+}
+function syncSelbar() {
+  const n = state.sel.size;
+  $('#selbar').hidden = !n || state.view !== 'organize';
+  $('#seln').textContent = `${n} selected`;
+  $('#org-grid').classList.toggle('selecting', n > 0);
+  const vis = orgItems();
+  $('#org-all').querySelector('.tc').textContent = vis.length && vis.every(s => state.sel.has(s.item.file)) ? 'Clear selection' : 'Select all';
+}
+function clearSelection() { state.sel.clear(); document.querySelectorAll('.tile.sel').forEach(t => t.classList.remove('sel')); syncSelbar(); }
+$('#org-grid').onclick = e => {
+  const tile = e.target.closest('.tile'); if (!tile) return;
+  const f = tile.dataset.f;
+  if (e.target.closest('.zoom')) { const sl = doneSlots().find(s => s.item.file === f); return sl && openLb(sl); }
+  const tiles = [...$('#org-grid').children], i = tiles.indexOf(tile);
+  if (e.shiftKey && lastPicked >= 0) {   // shift-click selects the range
+    const [a, z] = [Math.min(i, lastPicked), Math.max(i, lastPicked)];
+    tiles.slice(a, z + 1).forEach(t => { state.sel.add(t.dataset.f); t.classList.add('sel'); });
+  } else {
+    state.sel.has(f) ? state.sel.delete(f) : state.sel.add(f);
+    tile.classList.toggle('sel', state.sel.has(f));
+  }
+  lastPicked = i;
+  syncSelbar();
+};
+$('#org-q').oninput = () => renderOrganize();
+$('#org-all').onclick = () => {
+  const vis = orgItems();
+  if (vis.length && vis.every(s => state.sel.has(s.item.file))) clearSelection();
+  else { vis.forEach(s => state.sel.add(s.item.file)); renderOrganize(); }
+};
+$('#sel-clear').onclick = clearSelection;
+$('#sel-mood').dataset.menuAnchor = '';
+$('#sel-mood').onclick = () => {
+  if (menuEl) return closeMenu();
+  const srcs = [...state.sel].map(f => 'outputs/' + f);
+  pickBoard($('#sel-mood'), async (id, name) => { await addImagesTo(srcs, id, name); clearSelection(); });
+};
+$('#sel-del').onclick = async () => {
+  const files = [...state.sel];
+  if (!confirm(`Delete ${files.length === 1 ? 'this image' : `these ${files.length} images`} from disk?`)) return;
+  await Promise.all(files.map(f => fetch('/api/outputs/' + f, { method: 'DELETE' })));
+  removeFiles(new Set(files));
+  clearSelection(); renderOrganize();
+  toast(`Deleted ${files.length === 1 ? '1 image' : files.length + ' images'}.`);
+};
+// Drop deleted images from the feed: rows lose those images, empty rows go away.
+function removeFiles(gone) {
+  state.jobs = state.jobs.filter(job => {
+    const keep = job.slots.filter(s => !(s.status === 'done' && gone.has(s.item.file)));
+    if (keep.length === job.slots.length) return true;
+    job.el?.remove(); job.el = null; job.slots = keep;
+    return keep.length > 0;
+  });
+  state.boards.forEach(b => { b.items = b.items.filter(i => !gone.has(i.replace(/^outputs\//, ''))); });
+  render();
+}
 
 // ---------- loading shader ----------
 // One shared WebGL context renders every pending tile, then blits into each tile's own 2D canvas.
@@ -579,7 +966,7 @@ function chipsFor(job) {
   const secs = done.map(x => x.item.stats?.seconds).filter(Boolean);
   const seeds = job.slots.map(x => x.seed).filter(x => x != null);
   return [
-    modelName(s.model), shapeName(s.aspectRatio), MODEL_INFO[s.model]?.noSize ? null : s.imageSize,
+    modelName(s.model), s.moodboard ? `Moodboard · ${s.moodboard.name}` : null, shapeName(s.aspectRatio), MODEL_INFO[s.model]?.noSize ? null : s.imageSize,
     seeds.length ? (seeds.length > 1 ? `Seed ${seeds[0]}–${seeds[seeds.length - 1]}` : `Seed ${seeds[0]}`) : null,
     s.temperature != null && s.temperature !== 1 ? `Creativity ${creativityWord(s.temperature).toLowerCase()} (${s.temperature})` : null,
     s.thinkingLevel ? `${planningName(s.thinkingLevel)} planning` : null,
@@ -630,6 +1017,7 @@ function fillDone(sl, animate) {
     <div class="hover">
       <button data-a="input" data-f="${f}" title="Add as a reference, then describe the change">Edit</button>
       <button data-a="vary" title="New images from this one, same prompt">Variations</button>
+      <button data-a="mood" data-f="${f}" data-menu-anchor title="Add to a moodboard">+ Moodboard</button>
       <a href="/outputs/${f}" download="${f}" title="Download">Download</a>
     </div>`;
   const img = wrap.querySelector('img');
@@ -697,16 +1085,17 @@ $('#feed').onclick = async e => {
     e.stopPropagation();
     const a = btn.dataset.a, sl = job.slots[+btn.closest('.cell')?.dataset.s];
     if (a === 'input') return useAsInput(btn.dataset.f);
+    if (a === 'mood') return pickBoard(btn, (id, name) => addImagesTo(['outputs/' + btn.dataset.f], id, name));
     if (a === 'retry') { runSlot(sl); return render(); }
     if (a === 'reuse') { applySettings(job.settings); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
     if (a === 'rerun') {
       const refs = await Promise.all((job.refs || []).map(async url => ({ url, mime: url.slice(5, url.indexOf(';')), data: url.split(',')[1] })));
-      return generate({ ...job.settings, seed: '' }, refs, job.slots.length);
+      return generate({ ...job.settings, seed: '' }, refs, job.slots.length, job.settings.moodboard?.id);
     }
     if (a === 'vary') {   // same prompt and settings, this image as the reference, fresh seeds
       const blob = await (await fetch('/outputs/' + sl.item.file)).blob();
       const url = await asDataUrl(blob);
-      return generate({ ...job.settings, seed: '' }, [{ mime: blob.type, data: url.split(',')[1], url }], state.S.runs);
+      return generate({ ...job.settings, seed: '' }, [{ mime: blob.type, data: url.split(',')[1], url }], state.S.runs, job.settings.moodboard?.id);
     }
     if (a === 'delete') {
       const files = job.slots.filter(x => x.status === 'done').map(x => x.item.file);
@@ -740,6 +1129,7 @@ $('#lbx').onclick = closeLb;
 $('#lbprev').onclick = () => step(-1);
 $('#lbnext').onclick = () => step(1);
 $('#lbedit').onclick = () => { const f = lb.item.file; closeLb(); useAsInput(f); };
+$('#lbmood').onclick = () => { if (menuEl) return closeMenu(); const f = lb.item.file; pickBoard($('#lbmood'), (id, name) => addImagesTo(['outputs/' + f], id, name)); };
 $('#lbstage').onclick = e => { if (e.target.id === 'lbstage') closeLb(); };
 document.addEventListener('keydown', e => {
   if (!lb) return;
@@ -754,7 +1144,10 @@ function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;'
 $('#examples').innerHTML = EXAMPLES.map(([tag, p]) => `<button class="ex" data-p="${esc(p)}"><span class="tag">${tag}</span>${esc(p)}</button>`).join('');
 $('#examples').onclick = e => { const b = e.target.closest('.ex'); if (b) { ta.value = b.dataset.p; ta.dispatchEvent(new Event('input')); ta.focus(); } };
 
-Promise.all([fetch('/api/models').then(r => r.json()), fetch('/api/gallery').then(r => r.json())]).then(([m, items]) => {
+Promise.all([fetch('/api/models').then(r => r.json()), fetch('/api/gallery').then(r => r.json()), fetch('/api/moodboards').then(r => r.json()).catch(() => [])]).then(([m, items, boards]) => {
+  state.boards = boards;
+  try { const id = localStorage.getItem(BOARD_KEY); if (boardById(id)) state.activeBoard = id; } catch {}
+  syncMoodButton();
   state.models = m.models;
   DEFAULTS.model = m.default;
   load(); buildControls(); syncControls();
@@ -768,7 +1161,8 @@ Promise.all([fetch('/api/models').then(r => r.json()), fetch('/api/gallery').the
   state.jobs = [...byJob.values()].map(j => { j.slots.sort((a, b) => a.run - b.run); j.settings.seed = j.slots[0].seed; return j; })
     .sort((a, b) => b.created - a.created);
   render();
-  if (!state.jobs.length) ta.focus();
+  route();
+  if (!state.jobs.length && state.view === 'create') ta.focus();
 });
 </script>
 </body>

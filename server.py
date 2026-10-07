@@ -6,8 +6,9 @@ usage: python3 server.py [port]   (default 8765, binds 127.0.0.1 only)
 Set COMFY_API_KEY in the environment or in a .env file next to this script.
 The key stays server-side and is never sent to the browser. Every output is saved
 to ./outputs/ with a .json sidecar holding the prompt, settings and Router stats.
+Moodboards live in ./moodboards/ (boards.json plus any uploaded images).
 """
-import base64, json, os, sys, time, uuid, urllib.request, urllib.error
+import base64, json, os, re, sys, threading, time, uuid, urllib.request, urllib.error
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -22,7 +23,22 @@ MODELS = {
 }
 DEFAULT_MODEL = "vertexai/gemini-nano-banana-2.1"
 ROUTER = "https://api.comfy.org/v2/models/"
+MB_DIR = os.path.join(ROOT, "moodboards")
+MB_ASSETS = os.path.join(MB_DIR, "assets")
+MB_FILE = os.path.join(MB_DIR, "boards.json")
+MB_LOCK = threading.Lock()
+# A board item is a path the page can load: a generated output or an uploaded asset.
+ITEM_RE = re.compile(r"^(outputs|moodboards/assets)/[\w.-]+$")
 os.makedirs(OUT, exist_ok=True)
+os.makedirs(MB_ASSETS, exist_ok=True)
+
+# The page packs a moodboard into grid sheets and sends them after the user's own references.
+# This note tells the model how to read them; the user never sees it.
+MOODBOARD_NOTE = (
+    "The last {n} reference image{s} {are} moodboard sheet{s}: grids of example images the user collected "
+    "for this piece. Treat them together as art direction only. Take the colour palette, lighting, texture, "
+    "materials, mood and visual style from them. Do not copy their subjects or layouts, and do not make a grid "
+    "or collage. Return one single image in that style.")
 
 
 def load_key():
@@ -41,9 +57,21 @@ def load_key():
 KEY = load_key()
 
 
+def prompt_text(req):
+    sheets = int((req.get("moodboard") or {}).get("sheets") or 0)
+    if not sheets:
+        return req["prompt"]
+    own = len(req.get("images", [])) - sheets
+    note = MOODBOARD_NOTE.format(n=sheets, s="s" if sheets > 1 else "", are="are" if sheets > 1 else "is")
+    if own > 0:
+        note = (f"The first {own} reference image{'s' if own > 1 else ''} {'are' if own > 1 else 'is'} the user's own "
+                "reference, to use as the request describes. ") + note
+    return f"{note}\n\nCreate: {req['prompt']}"
+
+
 def build_body(req):
     parts = [{"inlineData": {"mimeType": i["mime"], "data": i["data"]}} for i in req.get("images", [])]
-    parts.append({"text": req["prompt"]})
+    parts.append({"text": prompt_text(req)})
     image_config = {"imageOutputOptions": {"mimeType": req.get("mimeType", "image/png")}}
     if req.get("model") != "vertexai/gemini-2.5-flash-image":  # NB1 has no imageSize
         image_config["imageSize"] = req.get("imageSize", "1K")
@@ -104,7 +132,8 @@ def generate(req):
                      "promptFeedback": data.get("promptFeedback")}
 
     settings = {k: v for k, v in req.items() if k != "images"}
-    settings["inputCount"] = len(req.get("images", []))
+    # Count only the user's own references; moodboard sheets are internal.
+    settings["inputCount"] = len(req.get("images", [])) - int((req.get("moodboard") or {}).get("sheets") or 0)
     saved = []
     for mime, raw in images:
         stem = time.strftime("%Y%m%d-%H%M%S-") + uuid.uuid4().hex[:6]
@@ -127,6 +156,58 @@ def gallery():
     return sorted(items, key=lambda m: m.get("created", 0), reverse=True)
 
 
+def mb_load():
+    try:
+        return json.load(open(MB_FILE))
+    except Exception:
+        return []
+
+
+def mb_save(boards):
+    tmp = MB_FILE + ".tmp"
+    json.dump(boards, open(tmp, "w"), indent=1)
+    os.replace(tmp, MB_FILE)
+
+
+def mb_list():
+    boards = mb_load()
+    for b in boards:  # hide images that were deleted from disk
+        b["items"] = [i for i in b["items"] if os.path.isfile(os.path.join(ROOT, i))]
+    return boards
+
+
+def mb_update(board_id, req):
+    with MB_LOCK:
+        boards = mb_load()
+        board = next((b for b in boards if b["id"] == board_id), None)
+        if not board:
+            return 404, {"error": "No such moodboard"}
+        if isinstance(req.get("name"), str) and req["name"].strip():
+            board["name"] = req["name"].strip()[:80]
+        for item in req.get("add", []):
+            if ITEM_RE.match(item) and item not in board["items"]:
+                board["items"].append(item)
+        drop = set(req.get("remove", []))
+        board["items"] = [i for i in board["items"] if i not in drop]
+        board["updated"] = time.time()
+        mb_save(boards)
+        return 200, board
+
+
+def mb_upload(board_id, req):
+    added = []
+    for img in req.get("images", [])[:200]:
+        mime = img.get("mime", "")
+        ext = ".jpg" if "jpeg" in mime else ".webp" if "webp" in mime else ".png"
+        name = time.strftime("%Y%m%d-%H%M%S-") + uuid.uuid4().hex[:6] + ext
+        open(os.path.join(MB_ASSETS, name), "wb").write(base64.b64decode(img["data"]))
+        added.append("moodboards/assets/" + name)
+    return mb_update(board_id, {"add": added})
+
+
+CTYPES = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp"}
+
+
 class H(BaseHTTPRequestHandler):
     def _send(self, code, payload, ctype="application/json"):
         body = payload if isinstance(payload, bytes) else json.dumps(payload).encode()
@@ -145,18 +226,33 @@ class H(BaseHTTPRequestHandler):
             return self._send(200, {"models": MODELS, "default": DEFAULT_MODEL})
         if path == "/api/gallery":
             return self._send(200, gallery())
-        if path.startswith("/outputs/"):
+        if path == "/api/moodboards":
+            return self._send(200, mb_list())
+        if path.startswith("/outputs/") or path.startswith("/moodboards/assets/"):
             name = os.path.basename(path)
-            fp = os.path.join(OUT, name)
+            fp = os.path.join(OUT if path.startswith("/outputs/") else MB_ASSETS, name)
             if os.path.isfile(fp):
-                ctype = "image/jpeg" if name.endswith(".jpg") else "image/png"
+                ctype = CTYPES.get(os.path.splitext(name)[1], "application/octet-stream")
                 return self._send(200, open(fp, "rb").read(), ctype)
         self._send(404, {"error": "not found"})
 
     def do_POST(self):
+        req = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
+        m = re.match(r"^/api/moodboards/([\w-]+)(/upload)?$", self.path)
+        if self.path == "/api/moodboards":
+            board = {"id": uuid.uuid4().hex[:10], "name": (req.get("name") or "Untitled moodboard").strip()[:80],
+                     "created": time.time(), "updated": time.time(), "items": []}
+            with MB_LOCK:
+                boards = mb_load()
+                boards.append(board)
+                mb_save(boards)
+            if req.get("add"):
+                return self._send(*mb_update(board["id"], {"add": req["add"]}))
+            return self._send(200, board)
+        if m:
+            return self._send(*(mb_upload if m.group(2) else mb_update)(m.group(1), req))
         if self.path != "/api/generate":
             return self._send(404, {"error": "not found"})
-        req = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         if not req.get("prompt", "").strip():
             return self._send(400, {"error": "Prompt is empty"})
         code, payload = generate(req)
@@ -169,6 +265,21 @@ class H(BaseHTTPRequestHandler):
                 fp = os.path.join(OUT, stem + ext)
                 if os.path.isfile(fp):
                     os.remove(fp)
+            return self._send(200, {"ok": True})
+        m = re.match(r"^/api/moodboards/([\w-]+)$", self.path)
+        if m:
+            with MB_LOCK:
+                boards = mb_load()
+                gone = [b for b in boards if b["id"] == m.group(1)]
+                keep = [b for b in boards if b["id"] != m.group(1)]
+                mb_save(keep)
+                used = {i for b in keep for i in b["items"]}
+                for i in (gone[0]["items"] if gone else []):  # uploaded images no other board uses
+                    if i.startswith("moodboards/assets/") and i not in used:
+                        try:
+                            os.remove(os.path.join(ROOT, i))
+                        except OSError:
+                            pass
             return self._send(200, {"ok": True})
         self._send(404, {"error": "not found"})
 
