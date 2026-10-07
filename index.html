@@ -69,6 +69,10 @@ label.k, .k { display:flex; align-items:baseline; gap:.6rem; height:1.15rem; lin
 select,input[type=number],input[type=text] { width:100%; height:2.75rem; background:var(--ink-soft); color:var(--warm-white); border:1px solid var(--t20); border-radius:.75rem; font:inherit; font-weight:400; font-size:1rem; padding:0 .85rem; outline:none; }
 select:focus,input:focus { border-color:var(--canvas); }
 input::placeholder { color:var(--muted); }
+/* Custom chevron: the native arrow ignores padding and sits against the edge. */
+select { appearance:none; -webkit-appearance:none; cursor:pointer; padding-right:2.75rem;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23C2BFB9' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 1rem center; background-size:14px; }
 .seg { display:inline-flex; border:1px solid var(--t20); border-radius:.75rem; overflow:hidden; }
 .seg button { height:calc(2.75rem - 2px); background:var(--ink-soft); color:var(--canvas); border:0; padding:0 1.05rem; cursor:pointer; font-weight:700; font-size:.9rem; min-width:3rem; }
 .seg button + button { border-left:1px solid var(--t20); }
