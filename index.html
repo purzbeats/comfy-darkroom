@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Comfy Darkroom</title>
+<link rel="icon" href="data:,">
+<style>
+@font-face { font-family: "PP Formula"; src: url("https://comfy.org/fonts/PPFormula-Light.woff2") format("woff2"); font-weight: 300; font-display: swap; }
+@font-face { font-family: "PP Formula"; src: url("https://comfy.org/fonts/PPFormula-Regular.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "PP Formula"; src: url("https://comfy.org/fonts/PPFormula-Bold.woff2") format("woff2"); font-weight: 700 800; font-display: swap; }
+@font-face { font-family: "PP Formula Narrow"; src: url("https://comfy.org/fonts/PPFormula-NarrowSemibold.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+:root {
+  --ink:#211927; --ink-light:#2A2330; --ink-soft:#1D1622; --yellow:#F2FF59; --canvas:#C2BFB9;
+  --warm-white:#F0EFED; --muted:#ABA8A3; --t4:rgba(255,255,255,.04); --t8:rgba(255,255,255,.08); --t20:rgba(255,255,255,.20);
+  --pass:#7FD8A6; --warn:#FABC25; --fail:#FFB4A8;
+  --font:"PP Formula","Space Grotesk","Chakra Petch",ui-sans-serif,system-ui,sans-serif;
+}
+* { box-sizing:border-box; }
+html,body { margin:0; background:var(--ink); color:var(--canvas); font-family:var(--font); font-weight:300; font-size:17px; }
+.tc { display:inline-block; position:relative; top:.1em; }
+button { font:inherit; }
+
+/* ---------- top bar ---------- */
+.top { position:sticky; top:0; z-index:5; background:var(--ink); padding:1rem 1.5rem .75rem; border-bottom:1px solid var(--t8); }
+.bar { max-width:110rem; margin:0 auto; display:flex; gap:.75rem; align-items:center; }
+.brand { font-family:"PP Formula Narrow",var(--font); font-weight:600; text-transform:uppercase; color:var(--warm-white); font-size:1.25rem; letter-spacing:-.01em; white-space:nowrap; }
+.prompt { flex:1; display:flex; align-items:center; gap:.5rem; background:var(--ink-light); border:1px solid var(--t20); border-radius:1rem; padding:.35rem .4rem .35rem 1rem; }
+.prompt:focus-within { border-color:var(--canvas); }
+.prompt textarea { flex:1; background:none; border:0; outline:none; resize:none; color:var(--warm-white); font:inherit; font-weight:400; font-size:1rem; line-height:1.4; padding:.45rem 0; height:2.3rem; max-height:10rem; }
+.prompt textarea::placeholder { color:var(--muted); }
+.ib { background:none; border:1px solid transparent; color:var(--canvas); border-radius:.75rem; height:2.3rem; min-width:2.3rem; padding:0 .55rem; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:.35rem; font-size:.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; }
+.ib:hover,.ib.on { background:var(--t8); color:var(--warm-white); }
+.ib svg { width:18px; height:18px; }
+.ib .badge { background:var(--warm-white); color:var(--ink); border-radius:.5rem; padding:0 .35rem; font-size:.7rem; line-height:1.2rem; }
+.go { font-size:.875rem; font-weight:800; text-transform:uppercase; letter-spacing:.05em; border-radius:1rem; height:2.3rem; padding:0 1.1rem; cursor:pointer; background:var(--yellow); color:var(--ink); border:1px solid var(--yellow); white-space:nowrap; }
+.go:hover { background:var(--warm-white); border-color:var(--warm-white); }
+
+/* settings drawer */
+.drawer { max-width:110rem; margin:.75rem auto 0; display:none; }
+.drawer.open { display:block; }
+.settings { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:.75rem 1rem; background:var(--t4); border-radius:1.5rem; padding:1rem 1.25rem 1.1rem; }
+.settings .wide { grid-column:span 2; }
+label.k { display:block; font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin-bottom:.35rem; }
+select,input[type=number],input[type=text] { width:100%; background:var(--ink-soft); color:var(--warm-white); border:1px solid var(--t20); border-radius:.75rem; font:inherit; font-weight:400; font-size:.95rem; padding:.5rem .7rem; outline:none; }
+select:focus,input:focus { border-color:var(--canvas); }
+input[type=range] { width:100%; accent-color:var(--canvas); margin-top:.45rem; }
+.rv { float:right; color:var(--warm-white); font-weight:400; letter-spacing:0; text-transform:none; }
+.seg { display:flex; border:1px solid var(--t20); border-radius:.75rem; overflow:hidden; }
+.seg button { flex:1; background:var(--ink-soft); color:var(--canvas); border:0; padding:.5rem 0; cursor:pointer; font-weight:700; font-size:.875rem; }
+.seg button + button { border-left:1px solid var(--t20); }
+.seg button.on { background:var(--warm-white); color:var(--ink); }
+
+/* inputs strip */
+.inputs { max-width:110rem; margin:.6rem auto 0; display:none; gap:.5rem; align-items:center; flex-wrap:wrap; }
+.inputs.has { display:flex; }
+.inputs .lbl { font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin-right:.25rem; }
+.thumb { position:relative; width:56px; height:56px; border-radius:.75rem; overflow:hidden; background:var(--ink-soft); }
+.thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+.thumb button { position:absolute; top:3px; right:3px; width:18px; height:18px; border-radius:50%; border:0; background:rgba(0,0,0,.7); color:#fff; cursor:pointer; font-size:12px; line-height:18px; padding:0; }
+.clear { font-size:.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; background:none; border:0; color:var(--muted); cursor:pointer; }
+.clear:hover { color:var(--warm-white); }
+body.drag::after { content:"Drop images to use as inputs"; position:fixed; inset:0; z-index:20; display:flex; align-items:center; justify-content:center; background:rgba(15,10,18,.85); color:var(--warm-white); font-size:1.5rem; border:2px dashed var(--t20); }
+
+/* ---------- feed ---------- */
+.feed { max-width:110rem; margin:0 auto; padding:1.5rem; display:flex; flex-direction:column; gap:2rem; }
+.job { display:grid; grid-template-columns:minmax(0,3fr) minmax(260px,1fr); gap:1.25rem; }
+@media (max-width:900px){ .job { grid-template-columns:1fr; } .brand { display:none; } .top,.feed { padding-left:1rem; padding-right:1rem; } }
+.imgs { display:grid; grid-template-columns:1fr 1fr; gap:6px; align-content:start; }
+.imgs.n1 { grid-template-columns:1fr; max-width:60%; }
+@media (max-width:900px){ .imgs.n1 { max-width:none; } }
+.cell { position:relative; background:var(--ink-soft); border-radius:.75rem; overflow:hidden; }
+.cell.done { cursor:zoom-in; }
+.cell canvas.fx { position:absolute; inset:0; width:100%; height:100%; display:block; }
+.cell .img { position:relative; width:100%; height:100%; }
+.cell .img img { width:100%; height:100%; object-fit:cover; display:block; }
+.cell.pending .img { position:absolute; inset:0; }
+@media (prefers-reduced-motion:no-preference){
+  .cell .img img { opacity:0; filter:blur(18px) saturate(.6); transform:scale(1.04); transition:opacity .7s ease, filter 1s ease, transform 1s cubic-bezier(.2,.7,.2,1); }
+  .cell .img.in img { opacity:1; filter:none; transform:none; }
+}
+.cell .status { position:absolute; left:.6rem; bottom:.6rem; background:rgba(20,14,24,.55); border-color:rgba(255,255,255,.14); }
+.cell.err { display:flex; flex-direction:column; align-items:flex-start; justify-content:flex-start; gap:.6rem; padding:1rem; aspect-ratio:16/9; overflow:auto; }
+.cell .hover { position:absolute; inset:auto 0 0 0; padding:.5rem; display:flex; gap:.35rem; justify-content:flex-end; opacity:0; transition:opacity .15s; background:linear-gradient(transparent,rgba(0,0,0,.55)); }
+.cell:hover .hover { opacity:1; }
+.hover button,.hover a { background:rgba(20,14,24,.8); color:var(--warm-white); border:1px solid var(--t20); border-radius:.6rem; font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; padding:.3rem .55rem; cursor:pointer; text-decoration:none; }
+.hover button:hover,.hover a:hover { background:var(--warm-white); color:var(--ink); }
+.cell .seedtag { position:absolute; top:.45rem; left:.45rem; font-size:.7rem; font-weight:700; letter-spacing:.04em; color:var(--warm-white); background:rgba(20,14,24,.7); border-radius:.5rem; padding:.15rem .45rem; opacity:0; transition:opacity .15s; }
+.cell:hover .seedtag { opacity:1; }
+.err pre { white-space:pre-wrap; word-break:break-word; font-size:.75rem; color:var(--canvas); margin:0; max-height:100%; overflow:auto; }
+.t { font-size:.85rem; font-weight:400; color:var(--muted); }
+.pill { display:inline-flex; align-items:center; gap:.4rem; border:1px solid var(--t20); border-radius:.75rem; padding:.2rem .6rem; font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--warm-white); }
+.dot { width:7px; height:7px; border-radius:50%; background:var(--warn); }
+.dot.fail { background:var(--fail); }
+@media (prefers-reduced-motion:no-preference){   .cell .status .dot { animation:pulse 1.2s ease-in-out infinite; } }
+@keyframes pulse { 50% { opacity:.3; } }
+
+.meta { align-self:start; position:sticky; top:6.5rem; }
+.meta .p { color:var(--warm-white); font-weight:400; font-size:1rem; line-height:1.45; margin:0 0 .7rem; white-space:pre-wrap; word-break:break-word; }
+.chips { display:flex; flex-wrap:wrap; gap:.35rem; }
+.chip { background:var(--t8); color:var(--canvas); border-radius:.5rem; padding:.2rem .5rem; font-size:.78rem; font-weight:400; }
+.refs { display:flex; gap:.35rem; margin:.6rem 0 0; }
+.refs img { width:40px; height:40px; object-fit:cover; border-radius:.5rem; }
+.acts { display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.8rem; }
+.btn { font-size:.72rem; font-weight:800; text-transform:uppercase; letter-spacing:.05em; border-radius:.75rem; padding:.45rem .75rem; cursor:pointer; border:1px solid var(--t20); background:transparent; color:var(--warm-white); transition:background .15s,color .15s,border-color .15s; }
+.btn:hover { background:var(--yellow); color:var(--ink); border-color:var(--yellow); }
+.empty { padding:5rem 1rem; text-align:center; color:var(--muted); font-weight:400; }
+
+/* lightbox */
+.lb { position:fixed; inset:0; background:rgba(15,10,18,.95); display:none; z-index:30; align-items:center; justify-content:center; padding:1.5rem; }
+.lb.open { display:flex; }
+.lb img { max-width:100%; max-height:100%; border-radius:1rem; }
+.lb .x { position:absolute; top:1rem; right:1rem; }
+.lb .info { position:absolute; bottom:1rem; left:50%; transform:translateX(-50%); font-size:.8rem; font-weight:400; color:var(--muted); background:rgba(20,14,24,.8); border-radius:.75rem; padding:.35rem .75rem; }
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="bar">
+    <div class="brand">Comfy Darkroom</div>
+    <div class="prompt">
+      <textarea id="prompt" rows="1" placeholder="Describe an image. Enter to generate, Shift+Enter for a new line."></textarea>
+      <button class="ib" id="addimg" title="Add input images">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-9 9"/></svg>
+        <span class="badge" id="imgcount" hidden>0</span>
+      </button>
+      <button class="ib" id="toggle" title="Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+        <span class="tc" id="summary"></span>
+      </button>
+    </div>
+    <button class="go" id="go"><span class="tc">Generate</span></button>
+  </div>
+  <input type="file" id="file" accept="image/*" multiple hidden>
+  <div class="inputs" id="inputs"></div>
+  <div class="drawer" id="drawer">
+    <div class="settings">
+      <div class="wide"><label class="k" for="model">Model</label><select id="model"></select></div>
+      <div><label class="k">Runs</label><div class="seg" id="runs"><button>1</button><button>2</button><button>3</button><button class="on">4</button></div></div>
+      <div><label class="k" for="ar">Aspect ratio</label>
+        <select id="ar"><option value="auto">Auto</option><option>1:1</option><option selected>16:9</option><option>9:16</option><option>4:3</option><option>3:4</option><option>3:2</option><option>2:3</option><option>5:4</option><option>4:5</option><option>21:9</option></select></div>
+      <div><label class="k" for="size">Size</label><select id="size"><option>1K</option><option selected>2K</option><option>4K</option></select></div>
+      <div><label class="k" for="fmt">Format</label><select id="fmt"><option value="image/png">PNG</option><option value="image/jpeg">JPEG</option></select></div>
+      <div><label class="k" for="seed">Seed</label><input type="number" id="seed" placeholder="Random"></div>
+      <div><label class="k" for="think">Thinking</label><select id="think"><option value="">Default</option><option>MINIMAL</option><option>MEDIUM</option><option>HIGH</option></select></div>
+      <div><label class="k" for="temp">Temperature <span class="rv" id="tempv">1.00</span></label><input type="range" id="temp" min="0" max="2" step="0.05" value="1"></div>
+      <div class="wide"><label class="k" for="sys">System instruction</label><input type="text" id="sys" placeholder="Optional"></div>
+    </div>
+  </div>
+</div>
+
+<div class="feed" id="feed"></div>
+<div class="empty" id="empty" hidden>No generations yet. Type a prompt above.</div>
+
+<div class="lb" id="lb"><button class="btn x" id="lbx"><span class="tc">Close</span></button><img id="lbimg" alt=""><div class="info" id="lbinfo"></div></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const SETTINGS_KEY = 'nb-playground-settings';
+const state = { inputs: [], jobs: [], models: {}, runs: 4 };
+const AR = { auto:'1/1', '1:1':'1/1','16:9':'16/9','9:16':'9/16','4:3':'4/3','3:4':'3/4','3:2':'3/2','2:3':'2/3','5:4':'5/4','4:5':'4/5','21:9':'21/9' };
+
+// ---------- settings ----------
+const fields = ['model','ar','size','fmt','seed','think','temp','sys'];
+function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...Object.fromEntries(fields.map(f => [f, $('#'+f).value])), runs: state.runs })); } catch {} summary(); }
+function loadSettings() {
+  try { const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}'); fields.forEach(f => { if (s[f] !== undefined && $('#'+f).querySelector?.(`option[value="${s[f]}"]`) !== null) $('#'+f).value = s[f]; }); if (s.runs) setRuns(s.runs); } catch {}
+  $('#tempv').textContent = (+$('#temp').value).toFixed(2);
+}
+function setRuns(n) { state.runs = +n; [...$('#runs').children].forEach(b => b.classList.toggle('on', +b.textContent === state.runs)); }
+function summary() { $('#summary').textContent = `${state.models[$('#model').value] || ''} · ${$('#ar').value} · ×${state.runs}`; }
+$('#runs').onclick = e => { if (e.target.tagName === 'BUTTON') { setRuns(e.target.textContent); saveSettings(); } };
+fields.forEach(f => $('#'+f).addEventListener('change', saveSettings));
+$('#temp').oninput = e => { $('#tempv').textContent = (+e.target.value).toFixed(2); };
+$('#toggle').onclick = () => { $('#drawer').classList.toggle('open'); $('#toggle').classList.toggle('on'); };
+
+// ---------- input images ----------
+function addFiles(files) {
+  for (const f of files) {
+    if (!f.type.startsWith('image/')) continue;
+    const r = new FileReader();
+    r.onload = () => { state.inputs.push({ name: f.name, mime: f.type, data: r.result.split(',')[1], url: r.result }); renderInputs(); };
+    r.readAsDataURL(f);
+  }
+}
+function renderInputs() {
+  const el = $('#inputs');
+  el.classList.toggle('has', state.inputs.length > 0);
+  el.innerHTML = `<span class="lbl">Inputs</span>` + state.inputs.map((im, i) =>
+    `<div class="thumb" title="${esc(im.name)}"><img src="${im.url}" alt=""><button data-i="${i}" aria-label="Remove">×</button></div>`).join('') +
+    `<button class="clear" id="clearin"><span class="tc">Clear</span></button>`;
+  $('#imgcount').hidden = !state.inputs.length; $('#imgcount').textContent = state.inputs.length;
+}
+$('#inputs').onclick = e => {
+  if (e.target.id === 'clearin' || e.target.parentElement?.id === 'clearin') { state.inputs = []; return renderInputs(); }
+  const i = e.target.dataset.i; if (i !== undefined) { state.inputs.splice(+i, 1); renderInputs(); }
+};
+$('#addimg').onclick = () => $('#file').click();
+$('#file').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
+let dragDepth = 0;
+document.addEventListener('dragenter', e => { if (e.dataTransfer.types.includes('Files')) { dragDepth++; document.body.classList.add('drag'); } });
+document.addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; document.body.classList.remove('drag'); } });
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; document.body.classList.remove('drag'); addFiles(e.dataTransfer.files); });
+document.addEventListener('paste', e => { const fs = [...e.clipboardData.files]; if (fs.length) { e.preventDefault(); addFiles(fs); } });
+async function useAsInput(file) {
+  const blob = await (await fetch('/outputs/' + file)).blob();
+  addFiles([new File([blob], file, { type: blob.type })]);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ---------- generate ----------
+const ta = $('#prompt');
+ta.addEventListener('input', () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 160) + 'px'; });
+ta.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); generate(); } });
+$('#go').onclick = () => generate();
+
+function currentSettings() {
+  return {
+    prompt: ta.value.trim(), model: $('#model').value, aspectRatio: $('#ar').value, imageSize: $('#size').value,
+    mimeType: $('#fmt').value, temperature: +$('#temp').value, thinkingLevel: $('#think').value || undefined,
+    system: $('#sys').value.trim() || undefined, seed: $('#seed').value,
+  };
+}
+function generate(s = currentSettings(), inputs = state.inputs, runs = state.runs) {
+  if (!s.prompt) { ta.focus(); return; }
+  const baseSeed = s.seed === '' || s.seed == null ? Math.floor(Math.random() * 2147483000) : +s.seed;
+  const jobId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const images = inputs.map(({ mime, data }) => ({ mime, data }));
+  const job = { jobId, settings: { ...s, seed: baseSeed }, refs: inputs.map(i => i.url), created: Date.now() / 1000, slots: [] };
+  for (let i = 0; i < runs; i++) {
+    const slot = { run: i, seed: baseSeed + i, started: Date.now(), status: 'pending' };
+    job.slots.push(slot);
+    // All runs fire at once; the server is threaded so they run in parallel against Router.
+    fetch('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...s, seed: slot.seed, jobId, run: i, runs, images }) })
+      .then(r => r.json())
+      .then(res => {
+        if (res.items && res.items.length) Object.assign(slot, { status: 'done', item: res.items[res.items.length - 1] });
+        else Object.assign(slot, { status: 'error', error: res.error || 'Failed', detail: res.detail || JSON.stringify(res.promptFeedback || res.text || '') });
+      })
+      .catch(err => Object.assign(slot, { status: 'error', error: 'Network error', detail: String(err) }))
+      .finally(render);
+  }
+  state.jobs.unshift(job);
+  render();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ---------- loading shader ----------
+// One shared WebGL context renders every pending tile, then blits into each tile's own 2D canvas.
+// Browsers cap live WebGL contexts (~16), so a context per tile would break at 4+ jobs.
+const Shader = (() => {
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const glc = document.createElement('canvas'); glc.width = glc.height = 256;
+  const gl = glc.getContext('webgl', { antialias: false, premultipliedAlpha: false });
+  const tiles = new Set();
+  if (!gl) return { add() {}, remove() {} };
+  const vs = 'attribute vec2 a;void main(){gl_Position=vec4(a,0.,1.);}';
+  const fs = `precision mediump float;uniform vec2 r;uniform float t,s;
+  float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+  float n(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+1.),f.x),f.y);}
+  float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<5;i++){v+=a*n(p);p=p*2.03+17.;a*=.5;}return v;}
+  void main(){
+    vec2 uv=gl_FragCoord.xy/r; vec2 p=uv*vec2(r.x/r.y,1.)*2.2+s*13.7; float tt=t*.12;
+    vec2 q=vec2(fbm(p+tt),fbm(p+vec2(5.2,1.3)-tt));
+    float f=fbm(p+2.*q+vec2(tt*.7,-tt*.4));
+    vec3 ink=vec3(.129,.098,.153),plum=vec3(.286,.216,.545),mauve=vec3(.302,.216,.384),cv=vec3(.761,.749,.725);
+    vec3 c=mix(ink,mauve,smoothstep(.2,.75,f));
+    c=mix(c,plum,smoothstep(.45,.95,q.x)*.75);
+    c+=cv*pow(smoothstep(.5,1.,f*q.y*1.7),3.)*.4;
+    float b=uv.x+uv.y*.35-mod(t*.22+s,2.6)+.4; c+=cv*exp(-b*b*18.)*.07;
+    c*=1.-.35*length(uv-.5);
+    gl_FragColor=vec4(c,1.);}`;
+  const sh = (type, src) => { const o = gl.createShader(type); gl.shaderSource(o, src); gl.compileShader(o); return o; };
+  const pr = gl.createProgram(); gl.attachShader(pr, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(pr); gl.useProgram(pr);
+  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(pr, 'a'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  const U = { r: gl.getUniformLocation(pr, 'r'), t: gl.getUniformLocation(pr, 't'), s: gl.getUniformLocation(pr, 's') };
+  const t0 = performance.now();
+  function draw(tile, t) {
+    const w = tile.c.width, hgt = tile.c.height;
+    gl.viewport(0, 0, w, hgt); gl.uniform2f(U.r, w, hgt); gl.uniform1f(U.t, t); gl.uniform1f(U.s, tile.seed);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    tile.ctx.drawImage(glc, 0, glc.height - hgt, w, hgt, 0, 0, w, hgt);
+  }
+  let raf = 0, last = 0;
+  function loop(now) {
+    raf = tiles.size ? requestAnimationFrame(loop) : 0;
+    if (now - last < 33) return; last = now;           // ~30fps is plenty for a blurred upscaled field
+    const t = (now - t0) / 1000;
+    for (const tile of tiles) draw(tile, t + tile.seed * 40);
+  }
+  return {
+    add(canvas, aspect, seed) {
+      const w = aspect >= 1 ? 224 : Math.round(224 * aspect), hgt = aspect >= 1 ? Math.round(224 / aspect) : 224;
+      canvas.width = w; canvas.height = hgt;
+      const tile = { c: canvas, ctx: canvas.getContext('2d'), seed: (seed * 0.6180339887) % 1 };   // golden-ratio spread: consecutive run seeds land far apart
+      if (reduce) { draw(tile, tile.seed * 40); return; }
+      tiles.add(tile); canvas._tile = tile;
+      if (!raf) raf = requestAnimationFrame(loop);
+    },
+    remove(canvas) { if (canvas._tile) tiles.delete(canvas._tile); },
+  };
+})();
+
+// ---------- feed ----------
+// The feed updates in place: each job and slot owns its DOM node, so a finished image
+// backfills its own shader tile without restarting the others.
+const arNum = a => { const [x, y] = (AR[a] || '1/1').split('/').map(Number); return x / y; };
+function chipsFor(job) {
+  const s = job.settings;
+  const done = job.slots.filter(x => x.status === 'done');
+  const secs = done.map(x => x.item.stats?.seconds).filter(Boolean);
+  const seeds = job.slots.map(x => x.seed).filter(x => x != null);
+  return [
+    state.models[s.model] || s.model, `ar ${s.aspectRatio}`, s.model === 'vertexai/gemini-2.5-flash-image' ? null : s.imageSize,
+    seeds.length ? (seeds.length > 1 ? `seed ${seeds[0]}–${seeds[seeds.length - 1]}` : `seed ${seeds[0]}`) : null,
+    s.thinkingLevel ? `thinking ${s.thinkingLevel.toLowerCase()}` : null, s.temperature !== 1 && s.temperature != null ? `temp ${s.temperature}` : null,
+    (s.mimeType || '').includes('jpeg') ? 'jpeg' : null,
+    secs.length ? `${Math.max(...secs)}s` : null,
+    new Date(job.created * 1000).toLocaleString([], { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' }),
+  ].filter(Boolean).map(c => `<span class="chip">${esc(c)}</span>`).join('');
+}
+function buildJob(job) {
+  const s = job.settings, el = document.createElement('section');
+  el.className = 'job'; el.dataset.job = job.jobId;
+  el.innerHTML = `<div class="imgs ${job.slots.length === 1 ? 'n1' : ''}"></div>
+    <div class="meta">
+      <p class="p">${esc(s.prompt)}</p>
+      <div class="chips"></div>
+      ${s.system ? `<div class="t" style="margin-top:.5rem">System: ${esc(s.system)}</div>` : ''}
+      ${job.refs?.length ? `<div class="refs">${job.refs.map(u => `<img src="${u}" alt="">`).join('')}</div>` : (s.inputCount ? `<div class="t" style="margin-top:.5rem">${s.inputCount} input image${s.inputCount > 1 ? 's' : ''}</div>` : '')}
+      <div class="acts">
+        <button class="btn" data-a="rerun"><span class="tc">Rerun</span></button>
+        <button class="btn" data-a="reuse"><span class="tc">Reuse settings</span></button>
+      </div>
+    </div>`;
+  const imgs = el.querySelector('.imgs');
+  job.slots.forEach((sl, si) => {
+    const cell = document.createElement('div');
+    cell.className = 'cell'; cell.dataset.s = si; sl.el = cell; sl.shown = null;
+    cell.style.aspectRatio = AR[s.aspectRatio] || '1/1';   // reserve space; corrected to the real size on load
+    if (sl.status === 'pending') {
+      cell.classList.add('pending'); cell.style.aspectRatio = AR[s.aspectRatio] || '1/1';
+      cell.innerHTML = `<canvas class="fx"></canvas><span class="status pill"><span class="dot"></span><span class="tc" data-t="${sl.started}">0s</span></span>`;
+      Shader.add(cell.querySelector('canvas'), arNum(s.aspectRatio), sl.seed ?? si);
+      sl.shown = 'pending';
+    }
+    imgs.appendChild(cell);
+  });
+  job.el = el;
+  return el;
+}
+function fillDone(sl, animate) {
+  const cell = sl.el, f = sl.item.file;
+  const wrap = document.createElement('div'); wrap.className = 'img' + (animate ? '' : ' in');
+  wrap.innerHTML = `<img src="/outputs/${f}" alt="">
+    <span class="seedtag">seed ${sl.seed ?? sl.item.settings.seed ?? '?'} · ${sl.item.stats?.seconds ?? '?'}s</span>
+    <div class="hover"><button data-a="input" data-f="${f}">Use as input</button><button data-a="vary">Vary</button><a href="/outputs/${f}" download="${f}">Save</a></div>`;
+  const img = wrap.querySelector('img');
+  cell.appendChild(wrap);
+  const finish = () => {
+    cell.classList.remove('pending'); cell.classList.add('done');
+    if (img.naturalWidth) cell.style.aspectRatio = `${img.naturalWidth}/${img.naturalHeight}`;
+    if (!animate) return;
+    requestAnimationFrame(() => wrap.classList.add('in'));
+    const fx = cell.querySelector('canvas.fx');
+    wrap.addEventListener('transitionend', () => { if (fx) { Shader.remove(fx); fx.remove(); } cell.querySelector('.status')?.remove(); }, { once: true });
+    setTimeout(() => { if (fx?.isConnected) { Shader.remove(fx); fx.remove(); } }, 2000);
+  };
+  img.complete && img.naturalWidth ? finish() : (img.onload = finish, img.onerror = finish);
+}
+function fillError(sl) {
+  const cell = sl.el, fx = cell.querySelector('canvas.fx');
+  if (fx) { Shader.remove(fx); fx.remove(); }
+  cell.querySelector('.status')?.remove();
+  cell.classList.remove('pending'); cell.classList.add('err');
+  cell.innerHTML = `<span class="pill"><span class="dot fail"></span><span class="tc">${esc(sl.error)}</span></span><pre>${esc(sl.detail || '')}</pre>`;
+}
+function render() {
+  $('#empty').hidden = state.jobs.length > 0;
+  const feed = $('#feed');
+  state.jobs.forEach((job, i) => {
+    if (!job.el) buildJob(job);
+    if (feed.children[i] !== job.el) feed.insertBefore(job.el, feed.children[i] || null);
+    job.el.querySelector('.chips').innerHTML = chipsFor(job);
+    job.slots.forEach(sl => {
+      if (sl.shown === sl.status) return;
+      if (sl.status === 'done') fillDone(sl, sl.shown === 'pending');
+      if (sl.status === 'error') fillError(sl);
+      sl.shown = sl.status;
+    });
+  });
+  while (feed.children.length > state.jobs.length) feed.lastElementChild.remove();
+  tick();
+}
+function tick() { document.querySelectorAll('[data-t]').forEach(el => el.textContent = ((Date.now() - +el.dataset.t) / 1000).toFixed(0) + 's'); }
+setInterval(tick, 1000);
+
+function applySettings(s) {
+  ta.value = s.prompt; ta.dispatchEvent(new Event('input'));
+  const set = (id, v) => { if (v != null && $('#'+id).querySelector?.(`option[value="${v}"]`) !== null) $('#'+id).value = v; };
+  set('model', s.model); set('ar', s.aspectRatio); set('size', s.imageSize); set('fmt', s.mimeType || 'image/png'); set('think', s.thinkingLevel || '');
+  $('#temp').value = s.temperature ?? 1; $('#tempv').textContent = (+$('#temp').value).toFixed(2);
+  $('#seed').value = s.seed ?? ''; $('#sys').value = s.system || '';
+  saveSettings();
+}
+const jobOf = el => state.jobs.find(j => j.jobId === el.closest('.job')?.dataset.job);
+
+$('#feed').onclick = async e => {
+  const btn = e.target.closest('[data-a]'), job = jobOf(e.target);
+  if (!job) return;
+  if (btn) {
+    e.stopPropagation();
+    const a = btn.dataset.a;
+    if (a === 'input') return useAsInput(btn.dataset.f);
+    if (a === 'reuse') { applySettings(job.settings); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+    if (a === 'rerun') return generate({ ...job.settings, seed: '' }, job.refs?.length ? state.inputs : [], job.slots.length);
+    if (a === 'vary') { // same prompt + settings, this image as the input, fresh seeds
+      const f = job.slots[+btn.closest('.cell').dataset.s].item.file;
+      const blob = await (await fetch('/outputs/' + f)).blob();
+      const url = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob); });
+      return generate({ ...job.settings, seed: '' }, [{ mime: blob.type, data: url.split(',')[1], url }], state.runs);
+    }
+    return;
+  }
+  const cell = e.target.closest('.cell.done');
+  if (cell) openLb(job.slots[+cell.dataset.s]);
+};
+
+// ---------- lightbox ----------
+let lb = null;
+const doneSlots = () => state.jobs.flatMap(j => j.slots.filter(s => s.status === 'done'));
+function openLb(sl) {
+  lb = sl;
+  $('#lbimg').src = '/outputs/' + sl.item.file;
+  $('#lbinfo').textContent = `${sl.item.file} · seed ${sl.seed ?? '?'} · ← → to browse`;
+  $('#lb').classList.add('open');
+}
+function closeLb() { $('#lb').classList.remove('open'); lb = null; }
+$('#lbx').onclick = closeLb;
+$('#lb').onclick = e => { if (e.target.id === 'lb') closeLb(); };
+document.addEventListener('keydown', e => {
+  if (!lb) return;
+  if (e.key === 'Escape') return closeLb();
+  const all = doneSlots(), i = all.indexOf(lb);
+  if (e.key === 'ArrowRight' && i < all.length - 1) openLb(all[i + 1]);
+  if (e.key === 'ArrowLeft' && i > 0) openLb(all[i - 1]);
+});
+
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+
+// ---------- boot ----------
+Promise.all([fetch('/api/models').then(r => r.json()), fetch('/api/gallery').then(r => r.json())]).then(([m, items]) => {
+  state.models = m.models;
+  $('#model').innerHTML = Object.entries(m.models).map(([id, name]) => `<option value="${id}">${esc(name)}</option>`).join('');
+  $('#model').value = m.default;
+  loadSettings(); summary();
+  // Group saved outputs back into rows by jobId (older single outputs become their own row).
+  const byJob = new Map();
+  for (const it of items.slice().reverse()) {
+    const id = it.settings.jobId || it.file;
+    if (!byJob.has(id)) byJob.set(id, { jobId: id, settings: { ...it.settings, seed: it.settings.seed }, created: it.created, slots: [] });
+    byJob.get(id).slots.push({ status: 'done', item: it, seed: it.settings.seed, run: it.settings.run ?? 0 });
+  }
+  state.jobs = [...byJob.values()].map(j => { j.slots.sort((a, b) => a.run - b.run); j.settings.seed = j.slots[0].seed; return j; })
+    .sort((a, b) => b.created - a.created);
+  render();
+});
+</script>
+</body>
+</html>
