@@ -9,7 +9,7 @@ A local image playground for the Nano Banana models on [Comfy Router](https://do
 - **Cancel:** stop one image or a whole row. One still waiting in line is dropped before it costs anything.
 - **References:** add images by button, drag and drop, or paste. They are numbered, so a prompt can say "the jacket from image 2". Any result can become a reference with **Edit**, or seed a new set with **Variations**.
 - **Plain-language controls:** Shape (Square, Wide, Tall, Poster…), Resolution, and under *More controls* Creativity, Planning, Seed, File type and Style notes. Each has a short hint.
-- **Feed:** one row per prompt, with its settings beside the images, plus **Run again**, **Use these settings** and **Delete**. Failed images explain what went wrong and offer **Try again**. Rate limits and dropped connections are retried once on their own.
+- **Feed:** one row per prompt, with its settings beside the images (tall shapes like 9:16 sit four across), plus **Run again**, **Use these settings** and **Delete**. Failed images explain what went wrong and offer **Try again**. Rate limits and dropped connections are retried once on their own.
 - **Viewer:** click an image to see it large with its model, shape, resolution, seed and time, plus **Copy prompt**, **Use these settings**, **Star**, **Edit**, **+ Moodboard** and **Download**. Downloads are named from the prompt and seed, like `fox-reading-a-map_s1234.png`.
 - **Stars:** star the keepers. Delete skips starred images, and Organize can show only them.
 - **Undo:** deleting images or a row shows **Undo** for a few seconds instead of asking first.
