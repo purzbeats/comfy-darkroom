@@ -291,6 +291,20 @@ def restore_outputs(names):
     return 200, {"items": restored}
 
 
+def star_output(name, starred):
+    fp = os.path.join(OUT, os.path.splitext(os.path.basename(name))[0] + ".json")
+    try:
+        meta = json.load(open(fp))
+    except (OSError, ValueError):
+        return 404, {"error": "No such image"}
+    if starred:
+        meta["starred"] = True
+    else:
+        meta.pop("starred", None)
+    json.dump(meta, open(fp, "w"), indent=1)
+    return 200, meta
+
+
 def mb_load():
     try:
         return json.load(open(MB_FILE))
@@ -378,6 +392,9 @@ class H(BaseHTTPRequestHandler):
         m = re.match(r"^/api/moodboards/([\w-]+)(/upload)?$", self.path)
         if self.path == "/api/outputs/restore":
             return self._send(*restore_outputs(req.get("files", [])))
+        star = re.match(r"^/api/outputs/([\w.-]+)/star$", self.path)
+        if star:
+            return self._send(*star_output(star.group(1), bool(req.get("starred"))))
         if self.path == "/api/moodboards":
             board = {"id": uuid.uuid4().hex[:10], "name": (req.get("name") or "Untitled moodboard").strip()[:80],
                      "created": time.time(), "updated": time.time(), "items": []}

@@ -146,6 +146,18 @@ select { appearance:none; -webkit-appearance:none; cursor:pointer; padding-right
 .hover button:hover,.hover a:hover { background:var(--warm-white); color:var(--ink); }
 .cell .seedtag { position:absolute; top:.5rem; left:.5rem; font-size:.72rem; font-weight:400; color:var(--warm-white); background:rgba(20,14,24,.75); border-radius:.5rem; padding:.15rem .45rem; opacity:0; transition:opacity .15s; }
 .cell:hover .seedtag { opacity:1; }
+.star { position:absolute; top:.45rem; right:.45rem; width:32px; height:32px; border-radius:.6rem; border:1px solid var(--t20); background:rgba(20,14,24,.75); color:var(--warm-white); cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center; opacity:0; transition:opacity .15s; }
+.star svg { width:17px; height:17px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linejoin:round; }
+.cell:hover .star, .star:focus-visible, .star.on { opacity:1; }
+@media (hover:none){ .star { opacity:1; } }
+.star:hover { background:var(--warm-white); color:var(--ink); }
+.star.on { color:var(--yellow); }
+.star.on svg { fill:currentColor; }
+.star.on:hover { background:rgba(20,14,24,.75); color:var(--yellow); }
+.tile .badge-star { position:absolute; left:.5rem; bottom:.5rem; width:20px; height:20px; color:var(--yellow); filter:drop-shadow(0 1px 2px rgba(0,0,0,.6)); display:none; }
+.tile .badge-star svg { width:100%; height:100%; fill:currentColor; }
+.tile.starred .badge-star { display:block; }
+.btn.on { background:var(--warm-white); color:var(--ink); border-color:var(--warm-white); }
 .cell.err { display:flex; flex-direction:column; align-items:flex-start; justify-content:center; gap:.55rem; padding:1.25rem; overflow:auto; }
 .cell.err .et { color:var(--warm-white); font-weight:400; font-size:1rem; }
 .cell.err .em { font-size:.88rem; font-weight:400; color:var(--muted); line-height:1.4; }
@@ -399,6 +411,7 @@ body.drag[data-drop="board"]::after { content:"Drop to add to this moodboard"; }
     <div><h2>Organize</h2><div class="sub" id="org-sub"></div></div>
     <div class="page-tools" id="org-tools">
       <input type="text" id="org-q" placeholder="Search prompts" aria-label="Search prompts">
+      <button class="btn" id="org-starred" aria-pressed="false" title="Show only starred images"><span class="tc">Starred</span></button>
       <button class="btn" id="org-all"><span class="tc">Select all</span></button>
     </div>
   </div>
@@ -411,6 +424,7 @@ body.drag[data-drop="board"]::after { content:"Drop to add to this moodboard"; }
 <div class="selbar" id="selbar" hidden>
   <span class="n" id="seln"></span>
   <button class="btn" id="sel-mood"><span class="tc">Add to moodboard</span></button>
+  <button class="btn" id="sel-star"><span class="tc">Star</span></button>
   <button class="btn quiet" id="sel-del"><span class="tc">Delete</span></button>
   <button class="btn quiet" id="sel-clear"><span class="tc">Clear</span></button>
 </div>
@@ -427,6 +441,7 @@ body.drag[data-drop="board"]::after { content:"Drop to add to this moodboard"; }
     <div class="acts">
       <button class="btn" id="lbcopy" title="Copy the prompt to the clipboard"><span class="tc">Copy prompt</span></button>
       <button class="btn" id="lbreuse" title="Load this image’s prompt, settings and seed into the bar"><span class="tc">Use these settings</span></button>
+      <button class="btn" id="lbstar"><span class="tc">Star</span></button>
       <button class="btn" id="lbedit"><span class="tc">Edit</span></button>
       <button class="btn" id="lbmood" data-menu-anchor><span class="tc">+ Moodboard</span></button>
       <a class="btn" id="lbdl" download><span class="tc">Download</span></a>
@@ -921,14 +936,18 @@ $('#mbfile').onchange = e => { if (state.boardOpen) uploadToBoard(state.boardOpe
 // ---------- organize ----------
 state.sel = new Set();
 let lastPicked = -1;
-const orgItems = () => { const q = $('#org-q').value.trim().toLowerCase(); return doneSlots().filter(s => !q || (s.item.settings?.prompt || '').toLowerCase().includes(q)); };
+let starredOnly = false;
+const orgItems = () => {
+  const q = $('#org-q').value.trim().toLowerCase();
+  return doneSlots().filter(s => (!starredOnly || s.item.starred) && (!q || (s.item.settings?.prompt || '').toLowerCase().includes(q)));
+};
 function renderOrganize() {
   const items = orgItems(), total = doneSlots().length;
   $('#org-sub').textContent = total ? `${total} image${total === 1 ? '' : 's'}. Select some to add them to a moodboard.` : '';
   $('#org-empty').hidden = total > 0;
   $('#org-tools').hidden = !total;
-  $('#org-grid').innerHTML = items.map(s => `<div class="tile ${state.sel.has(s.item.file) ? 'sel' : ''}" data-f="${s.item.file}" title="${esc(s.item.settings?.prompt || '')}">
-    <img loading="lazy" src="/outputs/${s.item.file}" alt=""><span class="tick"></span><button class="zoom" aria-label="View larger" title="View larger">⤢</button></div>`).join('');
+  $('#org-grid').innerHTML = items.map(s => `<div class="tile ${state.sel.has(s.item.file) ? 'sel' : ''} ${s.item.starred ? 'starred' : ''}" data-f="${s.item.file}" title="${esc(s.item.settings?.prompt || '')}">
+    <img loading="lazy" src="/outputs/${s.item.file}" alt=""><span class="tick"></span><span class="badge-star"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg></span><button class="zoom" aria-label="View larger" title="View larger">⤢</button></div>`).join('');
   syncSelbar();
 }
 function syncSelbar() {
@@ -938,6 +957,8 @@ function syncSelbar() {
   $('#org-grid').classList.toggle('selecting', n > 0);
   const vis = orgItems();
   $('#org-all').querySelector('.tc').textContent = vis.length && vis.every(s => state.sel.has(s.item.file)) ? 'Clear selection' : 'Select all';
+  const picked = doneSlots().filter(s => state.sel.has(s.item.file));
+  $('#sel-star').querySelector('.tc').textContent = picked.length && picked.every(s => s.item.starred) ? 'Unstar' : 'Star';
 }
 function clearSelection() { state.sel.clear(); document.querySelectorAll('.tile.sel').forEach(t => t.classList.remove('sel')); syncSelbar(); }
 $('#org-grid').onclick = e => {
@@ -956,6 +977,15 @@ $('#org-grid').onclick = e => {
   syncSelbar();
 };
 $('#org-q').oninput = () => renderOrganize();
+$('#org-starred').onclick = () => {
+  starredOnly = !starredOnly;
+  $('#org-starred').classList.toggle('on', starredOnly); $('#org-starred').setAttribute('aria-pressed', starredOnly);
+  clearSelection(); renderOrganize();
+};
+$('#sel-star').onclick = () => {
+  const picked = doneSlots().filter(s => state.sel.has(s.item.file));
+  setStarred(picked.map(s => s.item.file), !picked.every(s => s.item.starred));
+};
 $('#org-all').onclick = () => {
   const vis = orgItems();
   if (vis.length && vis.every(s => state.sel.has(s.item.file))) clearSelection();
@@ -970,12 +1000,15 @@ $('#sel-mood').onclick = () => {
 };
 $('#sel-del').onclick = async () => { const files = [...state.sel]; clearSelection(); await deleteImages(files); };
 // Deleting moves images to the server's trash, so a toast can offer Undo instead of asking first.
-async function deleteImages(files) {
+async function deleteImages(all) {
+  const starred = new Set(doneSlots().filter(s => s.item.starred).map(s => s.item.file));
+  const files = all.filter(f => !starred.has(f)), kept = all.length - files.length;
+  if (!files.length) return toast(kept === 1 ? 'That image is starred. Unstar it to delete it.' : 'Those images are starred. Unstar them to delete them.');
   const snap = new Map(state.jobs.map(j => [j, j.slots.slice()]));
   await Promise.all(files.map(f => fetch('/api/outputs/' + f, { method: 'DELETE' })));
   removeFiles(new Set(files));
   if (state.view === 'organize') renderOrganize();
-  toast(`Deleted ${files.length === 1 ? '1 image' : files.length + ' images'}.`, { action: 'Undo', onAction: () => undoDelete(snap) });
+  toast(`Deleted ${files.length === 1 ? '1 image' : files.length + ' images'}.${kept ? ` Kept ${kept} starred.` : ''}`, { action: 'Undo', onAction: () => undoDelete(snap) });
 }
 async function undoDelete(snap) {
   let back;
@@ -994,6 +1027,22 @@ async function undoDelete(snap) {
   if (state.view === 'organize') renderOrganize();
   if (state.view === 'moodboards') renderBoards();
   toast(`Restored ${back.size === 1 ? '1 image' : back.size + ' images'}.`);
+}
+// Starred images are skipped by Delete until they're unstarred. The flag lives in each image's .json.
+async function setStarred(files, on) {
+  const bySlot = new Map(doneSlots().map(s => [s.item.file, s]));
+  files.forEach(f => { const s = bySlot.get(f); if (s) s.item.starred = on || undefined; });
+  syncStars();
+  const ok = await Promise.all(files.map(f => api(`/api/outputs/${f}/star`, { starred: on }).then(() => true, () => false)));
+  if (ok.includes(false)) toast('Couldn’t save every star. Try again.');
+  else if (files.length > 1) toast(`${on ? 'Starred' : 'Unstarred'} ${files.length} images.`);
+}
+function syncStars() {
+  const starred = new Set(doneSlots().filter(s => s.item.starred).map(s => s.item.file));
+  document.querySelectorAll('.star[data-star]').forEach(b => { const on = starred.has(b.dataset.star); b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+  if (lb) { $('#lbstar').querySelector('.tc').textContent = lb.item.starred ? '★ Starred' : 'Star'; $('#lbstar').classList.toggle('on', !!lb.item.starred); }
+  document.querySelectorAll('#org-grid .tile').forEach(t => t.classList.toggle('starred', starred.has(t.dataset.f)));
+  if (state.view === 'organize') { if (starredOnly) renderOrganize(); else syncSelbar(); }
 }
 // Drop deleted images from the feed: rows lose those images, and rows left with only failed tiles go away.
 function removeFiles(gone) {
@@ -1144,6 +1193,7 @@ function fillDone(sl, animate) {
   const wrap = document.createElement('div'); wrap.className = 'img' + (animate ? '' : ' in');
   wrap.innerHTML = `<img src="/outputs/${f}" alt="${esc(sl.item.settings?.prompt || '')}">
     <span class="seedtag">Seed ${sl.seed ?? sl.item.settings.seed ?? '?'} · ${sl.item.stats?.seconds ?? '?'}s</span>
+    <button class="star ${sl.item.starred ? 'on' : ''}" data-a="star" data-star="${f}" aria-pressed="${!!sl.item.starred}" title="Star: keeps it safe from Delete"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg></button>
     <div class="hover">
       <button data-a="input" data-f="${f}" title="Add as a reference, then describe the change">Edit</button>
       <button data-a="vary" title="New images from this one, same prompt">Variations</button>
@@ -1249,6 +1299,7 @@ $('#feed').onclick = async e => {
     if (a === 'mood') return pickBoard(btn, (id, name) => addImagesTo(['outputs/' + btn.dataset.f], id, name));
     if (a === 'retry') { runSlot(sl); return render(); }
     if (a === 'cancel') { cancelSlot(sl); return render(); }
+    if (a === 'star') return setStarred([sl.item.file], !sl.item.starred);
     if (a === 'cancelall') { job.slots.filter(x => x.status === 'pending').forEach(cancelSlot); return render(); }
     if (a === 'reuse') { applySettings(job.settings); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
     if (a === 'rerun') {
@@ -1283,6 +1334,7 @@ function openLb(sl) {
   $('#lbimg').src = '/outputs/' + sl.item.file;
   $('#lbp').textContent = sl.item.settings?.prompt || '';
   $('#lbchips').innerHTML = itemChips(sl.item);
+  syncStars();
   $('#lbdl').href = '/outputs/' + sl.item.file; $('#lbdl').download = dlName(sl.item);
   $('#lbprev').disabled = i <= 0; $('#lbnext').disabled = i >= all.length - 1;
   $('#lb').classList.add('open');
@@ -1292,6 +1344,7 @@ function closeLb() { $('#lb').classList.remove('open'); lb = null; }
 $('#lbx').onclick = closeLb;
 $('#lbprev').onclick = () => step(-1);
 $('#lbnext').onclick = () => step(1);
+$('#lbstar').onclick = () => setStarred([lb.item.file], !lb.item.starred);
 $('#lbcopy').onclick = () => navigator.clipboard.writeText(lb.item.settings?.prompt || '').then(() => toast('Prompt copied.'), () => toast('Couldn’t copy. Select the text instead.'));
 $('#lbreuse').onclick = () => { const s = lb.item.settings; closeLb(); if (state.view !== 'create') go('create'); applySettings(s); window.scrollTo({ top: 0, behavior: 'smooth' }); };
 $('#lbedit').onclick = () => { const f = lb.item.file; closeLb(); useAsInput(f); };
