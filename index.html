@@ -195,7 +195,9 @@ kbd { font-family:inherit; font-size:.78rem; font-weight:700; color:var(--warm-w
 .lb .nav:disabled { opacity:.25; cursor:default; background:rgba(20,14,24,.8); color:var(--warm-white); }
 .lb .prev { left:1rem; } .lb .next { right:1rem; }
 .lb .cap { display:flex; gap:1rem; align-items:center; justify-content:space-between; padding:.75rem 1.5rem 1.25rem; flex-wrap:wrap; }
-.lb .cap .p { font-size:.95rem; font-weight:400; color:var(--canvas); max-width:60rem; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+.lb .cap .info { flex:1 1 30rem; min-width:0; max-width:60rem; }
+.lb .cap .p { font-size:.95rem; font-weight:400; color:var(--canvas); overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+.lb .cap .chips { margin-top:.5rem; }
 .lb .cap .acts { margin:0; }
 @media (max-width:700px){ .lb .stage { padding:1rem .5rem .5rem; } .lb .nav { top:auto; bottom:.5rem; transform:none; } }
 
@@ -418,8 +420,10 @@ body.drag[data-drop="board"]::after { content:"Drop to add to this moodboard"; }
     <button class="nav next" id="lbnext" aria-label="Next image">›</button>
   </div>
   <div class="cap">
-    <div class="p" id="lbp"></div>
+    <div class="info"><div class="p" id="lbp"></div><div class="chips" id="lbchips"></div></div>
     <div class="acts">
+      <button class="btn" id="lbcopy" title="Copy the prompt to the clipboard"><span class="tc">Copy prompt</span></button>
+      <button class="btn" id="lbreuse" title="Load this image’s prompt, settings and seed into the bar"><span class="tc">Use these settings</span></button>
       <button class="btn" id="lbedit"><span class="tc">Edit</span></button>
       <button class="btn" id="lbmood" data-menu-anchor><span class="tc">+ Moodboard</span></button>
       <a class="btn" id="lbdl" download><span class="tc">Download</span></a>
@@ -573,6 +577,21 @@ const ta = $('#prompt');
 ta.addEventListener('input', () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 160) + 'px'; });
 ta.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); generate(); } });
 $('#go').onclick = () => generate();
+// ↑ and ↓ in an empty prompt (or one showing a past prompt) step through earlier prompts, newest first.
+let histAt = -1;
+ta.addEventListener('keydown', e => {
+  if ((e.key !== 'ArrowUp' && e.key !== 'ArrowDown') || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.isComposing) return;
+  const past = [...new Set(state.jobs.map(j => j.settings.prompt).filter(Boolean))];
+  const browsing = histAt >= 0 && ta.value === past[histAt];
+  if (ta.value && !browsing) return;   // leave what's being typed alone
+  e.preventDefault();
+  const next = e.key === 'ArrowUp' ? (browsing ? histAt + 1 : 0) : (browsing ? histAt - 1 : -1);
+  if (next >= past.length) return;
+  histAt = next;
+  ta.value = next < 0 ? '' : past[next];
+  ta.dispatchEvent(new Event('input'));
+  ta.setSelectionRange(ta.value.length, ta.value.length);
+});
 
 // The request shape the server expects (Router field names).
 function requestFrom(s, prompt) {
@@ -1030,6 +1049,25 @@ function chipsFor(job) {
     new Date(job.created * 1000).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }),
   ].filter(Boolean).map(c => `<span class="chip">${esc(c)}</span>`).join('');
 }
+// One image's settings, for the lightbox.
+function itemChips(it) {
+  const s = it.settings || {};
+  return [
+    modelName(s.model), s.moodboard ? `Moodboard · ${s.moodboard.name}` : null, s.aspectRatio && shapeName(s.aspectRatio),
+    MODEL_INFO[s.model]?.noSize ? null : s.imageSize, s.seed != null && s.seed !== '' ? `Seed ${s.seed}` : null,
+    s.temperature != null && s.temperature !== 1 ? `Creativity ${creativityWord(s.temperature).toLowerCase()} (${s.temperature})` : null,
+    s.thinkingLevel ? `${planningName(s.thinkingLevel)} planning` : null, s.system ? 'Style notes on' : null,
+    it.stats?.seconds ? `${it.stats.seconds}s` : null,
+    new Date(it.created * 1000).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }),
+  ].filter(Boolean).map(c => `<span class="chip">${esc(c)}</span>`).join('');
+}
+// Save as "fox-reading-a-map-in-a_s1234.png" rather than the timestamp name on disk.
+function dlName(it) {
+  const slug = (it.settings?.prompt || '').toLowerCase().normalize('NFKD').replace(/[^a-z0-9\s-]/g, '').trim()
+    .split(/[\s-]+/).slice(0, 6).join('-').slice(0, 48).replace(/-+$/, '') || 'darkroom';
+  const seed = it.settings?.seed;
+  return slug + (seed != null && seed !== '' ? '_s' + seed : '') + it.file.slice(it.file.lastIndexOf('.'));
+}
 function buildJob(job) {
   const s = job.settings, el = document.createElement('section');
   el.className = 'job'; el.dataset.job = job.jobId;
@@ -1075,7 +1113,7 @@ function fillDone(sl, animate) {
       <button data-a="input" data-f="${f}" title="Add as a reference, then describe the change">Edit</button>
       <button data-a="vary" title="New images from this one, same prompt">Variations</button>
       <button data-a="mood" data-f="${f}" data-menu-anchor title="Add to a moodboard">+ Moodboard</button>
-      <a href="/outputs/${f}" download="${f}" title="Download">Download</a>
+      <a href="/outputs/${f}" download="${esc(dlName(sl.item))}" title="Download">Download</a>
     </div>`;
   const img = wrap.querySelector('img');
   cell.appendChild(wrap);
@@ -1102,6 +1140,7 @@ function fillError(sl) {
 }
 function render() {
   $('#empty').hidden = state.jobs.length > 0;
+  ta.placeholder = state.jobs.length ? 'Describe an image, or press ↑ for an earlier prompt' : 'Describe an image';
   const feed = $('#feed');
   state.jobs.forEach((job, i) => {
     if (!job.el) buildJob(job);
@@ -1185,7 +1224,8 @@ function openLb(sl) {
   const all = doneSlots(), i = all.indexOf(sl);
   $('#lbimg').src = '/outputs/' + sl.item.file;
   $('#lbp').textContent = sl.item.settings?.prompt || '';
-  $('#lbdl').href = '/outputs/' + sl.item.file; $('#lbdl').download = sl.item.file;
+  $('#lbchips').innerHTML = itemChips(sl.item);
+  $('#lbdl').href = '/outputs/' + sl.item.file; $('#lbdl').download = dlName(sl.item);
   $('#lbprev').disabled = i <= 0; $('#lbnext').disabled = i >= all.length - 1;
   $('#lb').classList.add('open');
 }
@@ -1194,6 +1234,8 @@ function closeLb() { $('#lb').classList.remove('open'); lb = null; }
 $('#lbx').onclick = closeLb;
 $('#lbprev').onclick = () => step(-1);
 $('#lbnext').onclick = () => step(1);
+$('#lbcopy').onclick = () => navigator.clipboard.writeText(lb.item.settings?.prompt || '').then(() => toast('Prompt copied.'), () => toast('Couldn’t copy. Select the text instead.'));
+$('#lbreuse').onclick = () => { const s = lb.item.settings; closeLb(); if (state.view !== 'create') go('create'); applySettings(s); window.scrollTo({ top: 0, behavior: 'smooth' }); };
 $('#lbedit').onclick = () => { const f = lb.item.file; closeLb(); useAsInput(f); };
 $('#lbmood').onclick = () => { if (menuEl) return closeMenu(); const f = lb.item.file; pickBoard($('#lbmood'), (id, name) => addImagesTo(['outputs/' + f], id, name)); };
 $('#lbstage').onclick = e => { if (e.target.id === 'lbstage') closeLb(); };
