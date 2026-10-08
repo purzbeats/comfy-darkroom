@@ -8,7 +8,7 @@ The key stays server-side and is never sent to the browser. Every output is save
 to ./outputs/ with a .json sidecar holding the prompt, settings and Router stats.
 Moodboards live in ./moodboards/ (boards.json plus any uploaded images).
 """
-import base64, json, os, re, sys, threading, time, uuid, urllib.request, urllib.error
+import base64, itertools, json, os, queue, re, sys, threading, time, uuid, urllib.request, urllib.error
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -31,6 +31,16 @@ MB_LOCK = threading.Lock()
 ITEM_RE = re.compile(r"^(outputs|moodboards/assets)/[\w.-]+$")
 os.makedirs(OUT, exist_ok=True)
 os.makedirs(MB_ASSETS, exist_ok=True)
+
+# Every image is a task. A fixed pool of workers makes the Router calls, so no more than MAX_ACTIVE
+# are in flight however many runs, tabs or reloads ask; the rest wait in line. The page polls
+# /api/tasks for progress. Finished tasks are kept a while so the page can collect them.
+MAX_ACTIVE = 8
+KEEP_FINISHED = 15 * 60
+TASKS = {}
+TASKS_LOCK = threading.Lock()
+LINE = queue.Queue()
+SEQ = itertools.count()  # place in line; time.time() can tie
 
 # The page packs a moodboard into grid sheets and sends them after the user's own references.
 # This note tells the model how to read them; the user never sees it.
@@ -90,7 +100,7 @@ def build_body(req):
     return body
 
 
-def generate(req):
+def generate(req, task=None):
     if req.get("model") not in MODELS:
         req["model"] = DEFAULT_MODEL
     body = build_body(req)
@@ -101,11 +111,13 @@ def generate(req):
         with urllib.request.urlopen(r, timeout=600) as resp:
             data, headers, status = json.load(resp), dict(resp.headers), resp.status
     except urllib.error.HTTPError as e:
-        return 502, {"error": f"Router HTTP {e.code}", "detail": e.read().decode()[:3000],
-                     "seconds": round(time.time() - t0, 1)}
+        return {"error": f"Router HTTP {e.code}", "detail": e.read().decode()[:3000],
+                "seconds": round(time.time() - t0, 1)}
     except Exception as e:  # timeout, DNS, etc.
-        return 502, {"error": type(e).__name__, "detail": str(e), "seconds": round(time.time() - t0, 1)}
+        return {"error": type(e).__name__, "detail": str(e), "seconds": round(time.time() - t0, 1)}
     secs = round(time.time() - t0, 1)
+    if task and task["status"] == "cancelled":  # Router finished (and billed), but the user stopped it
+        return {"error": "Cancelled"}
 
     # Collect image parts. Thought parts are previews; keep them only if nothing else came back.
     finals, thoughts, texts = [], [], []
@@ -128,8 +140,8 @@ def generate(req):
              "droppedParams": headers.get("X-Comfy-Router-Dropped-Params"),
              "previewsDropped": len(thoughts) if finals else 0, "http": status}
     if not images:
-        return 200, {"error": "No image returned", "text": texts, "stats": stats,
-                     "promptFeedback": data.get("promptFeedback")}
+        return {"error": "No image returned", "text": texts, "stats": stats,
+                "promptFeedback": data.get("promptFeedback")}
 
     settings = {k: v for k, v in req.items() if k != "images"}
     # Count only the user's own references; moodboard sheets are internal.
@@ -142,7 +154,72 @@ def generate(req):
         meta = {"file": name, "created": time.time(), "settings": settings, "stats": stats, "text": texts}
         json.dump(meta, open(os.path.join(OUT, stem + ".json"), "w"), indent=1)
         saved.append(meta)
-    return 200, {"items": saved, "stats": stats, "text": texts}
+    return {"items": saved, "stats": stats, "text": texts}
+
+
+def submit(req):
+    task = {"id": uuid.uuid4().hex[:12], "status": "queued", "created": time.time(), "seq": next(SEQ), "req": req,
+            "imageCount": len(req.get("images", []))}
+    with TASKS_LOCK:
+        TASKS[task["id"]] = task
+        LINE.put(task)
+        return task_view(task)
+
+
+def worker():
+    while True:
+        task = LINE.get()
+        with TASKS_LOCK:
+            if task["status"] != "queued":  # cancelled while it waited
+                continue
+            task["status"], task["started"] = "running", time.time()
+        try:
+            result = generate(task["req"], task)
+        except Exception as e:  # never let one bad response take a worker down
+            result = {"error": type(e).__name__, "detail": str(e)}
+        with TASKS_LOCK:
+            task["req"].pop("images", None)
+            task["finished"] = time.time()
+            if task["status"] == "cancelled":
+                continue
+            task["status"] = "done" if result.get("items") else "error"
+            task["result"] = result
+
+
+def task_view(t):
+    """What the page sees of a task: its settings (without the image data), progress and result."""
+    v = {k: t.get(k) for k in ("id", "status", "created", "imageCount", "result")}
+    v["settings"] = {k: x for k, x in t["req"].items() if k != "images"}
+    v["elapsed"] = round(time.time() - t["started"], 1) if t.get("started") else 0
+    if t["status"] == "queued":
+        v["ahead"] = sum(1 for o in TASKS.values() if o["status"] == "queued" and o["seq"] < t["seq"])
+    return v
+
+
+def tasks():
+    with TASKS_LOCK:
+        now = time.time()
+        for tid in [k for k, t in TASKS.items() if t.get("finished") and now - t["finished"] > KEEP_FINISHED]:
+            del TASKS[tid]
+        return [task_view(t) for t in TASKS.values()]
+
+
+def cancel(tid):
+    with TASKS_LOCK:
+        task = TASKS.get(tid)
+        if not task:
+            return 404, {"error": "No such task"}
+        if task["status"] in ("queued", "running"):
+            if task["status"] == "queued":
+                task["req"].pop("images", None)
+                task["finished"] = time.time()
+            task["status"] = "cancelled"
+        return 200, task_view(task)
+
+
+def start_workers():
+    for _ in range(MAX_ACTIVE):
+        threading.Thread(target=worker, daemon=True).start()
 
 
 def gallery():
@@ -228,6 +305,8 @@ class H(BaseHTTPRequestHandler):
             return self._send(200, gallery())
         if path == "/api/moodboards":
             return self._send(200, mb_list())
+        if path == "/api/tasks":
+            return self._send(200, tasks())
         if path.startswith("/outputs/") or path.startswith("/moodboards/assets/"):
             name = os.path.basename(path)
             fp = os.path.join(OUT if path.startswith("/outputs/") else MB_ASSETS, name)
@@ -255,10 +334,12 @@ class H(BaseHTTPRequestHandler):
             return self._send(404, {"error": "not found"})
         if not req.get("prompt", "").strip():
             return self._send(400, {"error": "Prompt is empty"})
-        code, payload = generate(req)
-        self._send(code, payload)
+        self._send(200, submit(req))
 
     def do_DELETE(self):
+        m = re.match(r"^/api/tasks/(\w+)$", self.path)
+        if m:
+            return self._send(*cancel(m.group(1)))
         if self.path.startswith("/api/outputs/"):
             stem = os.path.splitext(os.path.basename(self.path))[0]
             for ext in (".png", ".jpg", ".json"):
@@ -284,10 +365,13 @@ class H(BaseHTTPRequestHandler):
         self._send(404, {"error": "not found"})
 
     def log_message(self, fmt, *args):
+        if "GET /api/tasks" in str(args[0] if args else ""):  # the page polls this every second
+            return
         sys.stderr.write("%s %s\n" % (time.strftime("%H:%M:%S"), fmt % args))
 
 
 if __name__ == "__main__":
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8765
+    start_workers()
     print(f"Comfy Darkroom: http://127.0.0.1:{port}")
     ThreadingHTTPServer(("127.0.0.1", port), H).serve_forever()

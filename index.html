@@ -124,7 +124,8 @@ select { appearance:none; -webkit-appearance:none; cursor:pointer; padding-right
 @media (max-width:900px){ .imgs.n1 { max-width:none; } }
 .cell { position:relative; background:var(--ink-soft); border-radius:.75rem; overflow:hidden; }
 .cell.done { cursor:zoom-in; }
-.cell canvas.fx { position:absolute; inset:0; width:100%; height:100%; display:block; }
+.cell canvas.fx { position:absolute; inset:0; width:100%; height:100%; display:block; transition:opacity .4s; }
+.cell.waiting canvas.fx { opacity:.4; }
 .cell .img { position:relative; width:100%; height:100%; }
 .cell .img img { width:100%; height:100%; object-fit:cover; display:block; }
 .cell.pending .img { position:absolute; inset:0; }
@@ -595,19 +596,58 @@ async function generate(req = requestFrom(state.S, ta.value.trim()), inputs = st
   const moodReq = sheets.length ? { ...mood, sheets: sheets.length } : undefined;
   job.slots.forEach((slot, i) => {
     slot.req = { ...req, seed: baseSeed + i, jobId, run: i, runs, images, moodboard: moodReq, inputCount: undefined };
-    runSlot(slot);   // all runs fire at once; the server is threaded, so they hit Router in parallel
+    runSlot(slot);
   });
 }
+// Each image is a task on the server, which runs at most 8 at a time and queues the rest.
+// The page hands tasks over, then one poll loop collects progress for all of them.
+const UNREACHABLE = { title: 'Can’t reach Darkroom', message: 'The local server isn’t answering. Is server.py still running?' };
 function runSlot(slot) {
-  Object.assign(slot, { status: 'pending', started: Date.now(), error: null });
+  Object.assign(slot, { status: 'pending', phase: 'sending', started: Date.now(), taskId: null, title: null, message: null, detail: null });
   fetch('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(slot.req) })
     .then(r => r.json().catch(() => ({ error: `Server HTTP ${r.status}` })))
-    .then(res => {
-      if (res.items && res.items.length) Object.assign(slot, { status: 'done', item: res.items[res.items.length - 1] });
-      else Object.assign(slot, { status: 'error', ...friendlyError(res) });
+    .then(t => {
+      if (!t.id) return Object.assign(slot, { status: 'error', ...friendlyError(t) });
+      slot.taskId = t.id;
+      applyTask(slot, t);
     })
-    .catch(err => Object.assign(slot, { status: 'error', title: 'Can’t reach Darkroom', message: 'The local server isn’t answering. Is server.py still running?', detail: String(err) }))
-    .finally(render);
+    .catch(err => Object.assign(slot, { status: 'error', ...UNREACHABLE, detail: String(err) }))
+    .finally(() => { render(); poll(); });
+}
+function applyTask(sl, t) {
+  if (t.status === 'queued') Object.assign(sl, { phase: 'queued', ahead: t.ahead });
+  else if (t.status === 'running') {
+    if (sl.phase !== 'running') sl.started = Date.now() - t.elapsed * 1000;
+    sl.phase = 'running';
+  }
+  else if (t.status === 'done') Object.assign(sl, { status: 'done', item: t.result.items[t.result.items.length - 1] });
+  else if (t.status === 'error') Object.assign(sl, { status: 'error', ...friendlyError(t.result || {}) });
+}
+const liveSlots = () => state.jobs.flatMap(j => j.slots.filter(s => s.status === 'pending'));
+let polling = false;
+async function poll() {
+  if (polling) return;
+  polling = true;
+  try {
+    while (liveSlots().length) {
+      await new Promise(r => setTimeout(r, 1000));
+      const tasks = await fetch('/api/tasks').then(r => r.json()).catch(() => null);
+      if (!tasks) continue;   // server briefly unreachable: keep waiting
+      const byId = new Map(tasks.map(t => [t.id, t]));
+      for (const sl of liveSlots()) {
+        if (!sl.taskId) continue;
+        const t = byId.get(sl.taskId);
+        if (t) applyTask(sl, t);
+        else Object.assign(sl, { status: 'error', title: 'Darkroom restarted', message: 'The server restarted before this image finished. Try again.' });
+      }
+      render();
+    }
+  } finally { polling = false; }
+}
+function slotLabel(sl) {
+  if (sl.phase === 'running') return `Developing ${((Date.now() - sl.started) / 1000).toFixed(0)}s`;
+  if (sl.phase === 'queued') return sl.ahead ? `In line · ${sl.ahead} ahead` : 'In line · next up';
+  return 'Sending';
 }
 // Turn Router and server failures into something a person can act on. Raw detail stays one click away.
 function friendlyError(res) {
@@ -1005,7 +1045,7 @@ function buildJob(job) {
 function showPending(sl, s) {
   const cell = sl.el;
   cell.className = 'cell pending'; cell.style.aspectRatio = AR[s.aspectRatio] || '1/1';
-  cell.innerHTML = `<canvas class="fx"></canvas><span class="status pill"><span class="dot"></span><span class="tc">Developing <span data-t="${sl.started}">0s</span></span></span>`;
+  cell.innerHTML = `<canvas class="fx"></canvas><span class="status pill"><span class="dot"></span><span class="tc lbl">${slotLabel(sl)}</span></span>`;
   Shader.add(cell.querySelector('canvas'), arNum(s.aspectRatio), sl.seed ?? +cell.dataset.s);
   sl.shown = 'pending';
 }
@@ -1040,7 +1080,7 @@ function fillError(sl) {
   cell.innerHTML = `<span class="pill"><span class="dot fail"></span><span class="tc">Failed</span></span>
     <div class="et">${esc(sl.title || 'Something went wrong')}</div>
     <div class="em">${esc(sl.message || '')}</div>
-    <button class="btn" data-a="retry"><span class="tc">Try again</span></button>
+    ${sl.req ? '<button class="btn" data-a="retry"><span class="tc">Try again</span></button>' : ''}
     ${sl.detail ? `<details><summary>Details</summary><pre>${esc(sl.detail)}</pre></details>` : ''}`;
 }
 function render() {
@@ -1061,7 +1101,13 @@ function render() {
   while (feed.children.length > state.jobs.length) feed.lastElementChild.remove();
   tick();
 }
-function tick() { document.querySelectorAll('[data-t]').forEach(el => el.textContent = ((Date.now() - +el.dataset.t) / 1000).toFixed(0) + 's'); }
+function tick() {
+  liveSlots().forEach(sl => {
+    const l = sl.el?.querySelector('.status .lbl'); if (!l) return;
+    l.textContent = slotLabel(sl);
+    sl.el.classList.toggle('waiting', sl.phase !== 'running');
+  });
+}
 setInterval(tick, 1000);
 
 // Load a past row's prompt and settings back into the bar.
@@ -1144,7 +1190,9 @@ function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;'
 $('#examples').innerHTML = EXAMPLES.map(([tag, p]) => `<button class="ex" data-p="${esc(p)}"><span class="tag">${tag}</span>${esc(p)}</button>`).join('');
 $('#examples').onclick = e => { const b = e.target.closest('.ex'); if (b) { ta.value = b.dataset.p; ta.dispatchEvent(new Event('input')); ta.focus(); } };
 
-Promise.all([fetch('/api/models').then(r => r.json()), fetch('/api/gallery').then(r => r.json()), fetch('/api/moodboards').then(r => r.json()).catch(() => [])]).then(([m, items, boards]) => {
+// Tasks are read before the gallery: one that finishes in between then shows up in both, never in neither.
+fetch('/api/tasks').then(r => r.json()).catch(() => []).then(live => Promise.all([fetch('/api/models').then(r => r.json()),
+  fetch('/api/gallery').then(r => r.json()), fetch('/api/moodboards').then(r => r.json()).catch(() => []), live])).then(([m, items, boards, live]) => {
   state.boards = boards;
   try { const id = localStorage.getItem(BOARD_KEY); if (boardById(id)) state.activeBoard = id; } catch {}
   syncMoodButton();
@@ -1158,9 +1206,20 @@ Promise.all([fetch('/api/models').then(r => r.json()), fetch('/api/gallery').the
     if (!byJob.has(id)) byJob.set(id, { jobId: id, settings: { ...it.settings }, created: it.created, slots: [] });
     byJob.get(id).slots.push({ status: 'done', item: it, seed: it.settings.seed, run: it.settings.run ?? 0 });
   }
+  // Images still queued or developing (say, after a reload) rejoin their rows and pick up polling.
+  for (const t of live.filter(t => t.status === 'queued' || t.status === 'running')) {
+    const s = t.settings, id = s.jobId || t.id;
+    if (!byJob.has(id)) byJob.set(id, { jobId: id, settings: { ...s, inputCount: Math.max(0, t.imageCount - (s.moodboard?.sheets || 0)) }, created: t.created, slots: [] });
+    const job = byJob.get(id);
+    if (job.slots.some(x => x.run === (s.run ?? 0))) continue;
+    const sl = { status: 'pending', taskId: t.id, seed: s.seed, run: s.run ?? 0, req: t.imageCount ? null : s };   // image data isn't kept, so no retry with references
+    applyTask(sl, t);
+    job.slots.push(sl);
+  }
   state.jobs = [...byJob.values()].map(j => { j.slots.sort((a, b) => a.run - b.run); j.settings.seed = j.slots[0].seed; return j; })
     .sort((a, b) => b.created - a.created);
   render();
+  poll();
   route();
   if (!state.jobs.length && state.view === 'create') ta.focus();
 });
