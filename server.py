@@ -8,7 +8,7 @@ The key stays server-side and is never sent to the browser. Every output is save
 to ./outputs/ with a .json sidecar holding the prompt, settings and Router stats.
 Moodboards live in ./moodboards/ (boards.json plus any uploaded images).
 """
-import base64, json, os, re, sys, threading, time, uuid, urllib.request, urllib.error
+import base64, itertools, json, os, queue, re, sys, threading, time, uuid, urllib.request, urllib.error
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -31,6 +31,18 @@ MB_LOCK = threading.Lock()
 ITEM_RE = re.compile(r"^(outputs|moodboards/assets)/[\w.-]+$")
 os.makedirs(OUT, exist_ok=True)
 os.makedirs(MB_ASSETS, exist_ok=True)
+
+# Every image is a task. A fixed pool of workers makes the Router calls, so no more than MAX_ACTIVE
+# are in flight however many runs, tabs or reloads ask; the rest wait in line. The page polls
+# /api/tasks for progress. Finished tasks are kept a while so the page can collect them.
+MAX_ACTIVE = 8
+KEEP_FINISHED = 15 * 60
+TASKS = {}
+TASKS_LOCK = threading.Lock()
+LINE = queue.Queue()
+SEQ = itertools.count()  # place in line; time.time() can tie
+# Router answers worth one more try, and how long to wait first. Anything else fails straight away.
+RETRY_AFTER = {429: 8, 500: 4, 502: 4, 503: 4, 504: 4}
 
 # The page packs a moodboard into grid sheets and sends them after the user's own references.
 # This note tells the model how to read them; the user never sees it.
@@ -90,22 +102,34 @@ def build_body(req):
     return body
 
 
-def generate(req):
+def generate(req, task=None):
     if req.get("model") not in MODELS:
         req["model"] = DEFAULT_MODEL
     body = build_body(req)
     r = urllib.request.Request(ROUTER + req["model"], data=json.dumps(body).encode(), method="POST",
                                headers={"X-API-Key": KEY, "Content-Type": "application/json"})
-    t0 = time.time()
-    try:
-        with urllib.request.urlopen(r, timeout=600) as resp:
-            data, headers, status = json.load(resp), dict(resp.headers), resp.status
-    except urllib.error.HTTPError as e:
-        return 502, {"error": f"Router HTTP {e.code}", "detail": e.read().decode()[:3000],
-                     "seconds": round(time.time() - t0, 1)}
-    except Exception as e:  # timeout, DNS, etc.
-        return 502, {"error": type(e).__name__, "detail": str(e), "seconds": round(time.time() - t0, 1)}
+    t0, retried = time.time(), False
+    while True:
+        try:
+            with urllib.request.urlopen(r, timeout=600) as resp:
+                data, headers, status = json.load(resp), dict(resp.headers), resp.status
+            break
+        except Exception as e:
+            http = isinstance(e, urllib.error.HTTPError)
+            # Rate limits, Router hiccups and dropped connections get one retry; timeouts don't.
+            transient = e.code in RETRY_AFTER if http else (
+                isinstance(e, (urllib.error.URLError, ConnectionError)) and not isinstance(getattr(e, "reason", e), TimeoutError))
+            if transient and not retried and not (task and task["status"] == "cancelled"):
+                retried = True
+                time.sleep(RETRY_AFTER.get(e.code, 4) if http else 4)
+                continue
+            if http:
+                return {"error": f"Router HTTP {e.code}", "detail": e.read().decode()[:3000],
+                        "seconds": round(time.time() - t0, 1), "retried": retried}
+            return {"error": type(e).__name__, "detail": str(e), "seconds": round(time.time() - t0, 1), "retried": retried}
     secs = round(time.time() - t0, 1)
+    if task and task["status"] == "cancelled":  # Router finished (and billed), but the user stopped it
+        return {"error": "Cancelled"}
 
     # Collect image parts. Thought parts are previews; keep them only if nothing else came back.
     finals, thoughts, texts = [], [], []
@@ -126,10 +150,10 @@ def generate(req):
              "finishReason": [c.get("finishReason") for c in data.get("candidates", [])],
              "fallbackProvider": headers.get("X-Comfy-Router-Fallback-Provider"),
              "droppedParams": headers.get("X-Comfy-Router-Dropped-Params"),
-             "previewsDropped": len(thoughts) if finals else 0, "http": status}
+             "previewsDropped": len(thoughts) if finals else 0, "http": status, "retried": retried}
     if not images:
-        return 200, {"error": "No image returned", "text": texts, "stats": stats,
-                     "promptFeedback": data.get("promptFeedback")}
+        return {"error": "No image returned", "text": texts, "stats": stats,
+                "promptFeedback": data.get("promptFeedback")}
 
     settings = {k: v for k, v in req.items() if k != "images"}
     # Count only the user's own references; moodboard sheets are internal.
@@ -142,7 +166,72 @@ def generate(req):
         meta = {"file": name, "created": time.time(), "settings": settings, "stats": stats, "text": texts}
         json.dump(meta, open(os.path.join(OUT, stem + ".json"), "w"), indent=1)
         saved.append(meta)
-    return 200, {"items": saved, "stats": stats, "text": texts}
+    return {"items": saved, "stats": stats, "text": texts}
+
+
+def submit(req):
+    task = {"id": uuid.uuid4().hex[:12], "status": "queued", "created": time.time(), "seq": next(SEQ), "req": req,
+            "imageCount": len(req.get("images", []))}
+    with TASKS_LOCK:
+        TASKS[task["id"]] = task
+        LINE.put(task)
+        return task_view(task)
+
+
+def worker():
+    while True:
+        task = LINE.get()
+        with TASKS_LOCK:
+            if task["status"] != "queued":  # cancelled while it waited
+                continue
+            task["status"], task["started"] = "running", time.time()
+        try:
+            result = generate(task["req"], task)
+        except Exception as e:  # never let one bad response take a worker down
+            result = {"error": type(e).__name__, "detail": str(e)}
+        with TASKS_LOCK:
+            task["req"].pop("images", None)
+            task["finished"] = time.time()
+            if task["status"] == "cancelled":
+                continue
+            task["status"] = "done" if result.get("items") else "error"
+            task["result"] = result
+
+
+def task_view(t):
+    """What the page sees of a task: its settings (without the image data), progress and result."""
+    v = {k: t.get(k) for k in ("id", "status", "created", "imageCount", "result")}
+    v["settings"] = {k: x for k, x in t["req"].items() if k != "images"}
+    v["elapsed"] = round(time.time() - t["started"], 1) if t.get("started") else 0
+    if t["status"] == "queued":
+        v["ahead"] = sum(1 for o in TASKS.values() if o["status"] == "queued" and o["seq"] < t["seq"])
+    return v
+
+
+def tasks():
+    with TASKS_LOCK:
+        now = time.time()
+        for tid in [k for k, t in TASKS.items() if t.get("finished") and now - t["finished"] > KEEP_FINISHED]:
+            del TASKS[tid]
+        return [task_view(t) for t in TASKS.values()]
+
+
+def cancel(tid):
+    with TASKS_LOCK:
+        task = TASKS.get(tid)
+        if not task:
+            return 404, {"error": "No such task"}
+        if task["status"] in ("queued", "running"):
+            if task["status"] == "queued":
+                task["req"].pop("images", None)
+                task["finished"] = time.time()
+            task["status"] = "cancelled"
+        return 200, task_view(task)
+
+
+def start_workers():
+    for _ in range(MAX_ACTIVE):
+        threading.Thread(target=worker, daemon=True).start()
 
 
 def gallery():
@@ -154,6 +243,66 @@ def gallery():
             except Exception:
                 pass
     return sorted(items, key=lambda m: m.get("created", 0), reverse=True)
+
+
+# Deleting an image moves it to outputs/.trash so the page can offer Undo. Trash older than a day
+# is cleared on the next delete and when the server starts.
+TRASH_DAYS = 1
+OUTPUT_EXTS = (".png", ".jpg", ".json")
+
+
+def trash_dir():
+    return os.path.join(OUT, ".trash")
+
+
+def empty_old_trash():
+    if not os.path.isdir(trash_dir()):
+        return
+    cutoff = time.time() - TRASH_DAYS * 86400
+    for f in os.listdir(trash_dir()):
+        fp = os.path.join(trash_dir(), f)
+        if os.path.getmtime(fp) < cutoff:
+            os.remove(fp)
+
+
+def trash_output(name):
+    stem = os.path.splitext(os.path.basename(name))[0]
+    os.makedirs(trash_dir(), exist_ok=True)
+    for ext in OUTPUT_EXTS:
+        fp = os.path.join(OUT, stem + ext)
+        if os.path.isfile(fp):
+            dest = os.path.join(trash_dir(), stem + ext)
+            os.replace(fp, dest)
+            os.utime(dest)  # age the trash from when it was deleted, not when it was made
+
+
+def restore_outputs(names):
+    restored = []
+    for name in names:
+        stem = os.path.splitext(os.path.basename(name))[0]
+        for ext in OUTPUT_EXTS:
+            fp = os.path.join(trash_dir(), stem + ext)
+            if os.path.isfile(fp):
+                os.replace(fp, os.path.join(OUT, stem + ext))
+        try:
+            restored.append(json.load(open(os.path.join(OUT, stem + ".json"))))
+        except (OSError, ValueError):
+            pass
+    return 200, {"items": restored}
+
+
+def star_output(name, starred):
+    fp = os.path.join(OUT, os.path.splitext(os.path.basename(name))[0] + ".json")
+    try:
+        meta = json.load(open(fp))
+    except (OSError, ValueError):
+        return 404, {"error": "No such image"}
+    if starred:
+        meta["starred"] = True
+    else:
+        meta.pop("starred", None)
+    json.dump(meta, open(fp, "w"), indent=1)
+    return 200, meta
 
 
 def mb_load():
@@ -228,6 +377,8 @@ class H(BaseHTTPRequestHandler):
             return self._send(200, gallery())
         if path == "/api/moodboards":
             return self._send(200, mb_list())
+        if path == "/api/tasks":
+            return self._send(200, tasks())
         if path.startswith("/outputs/") or path.startswith("/moodboards/assets/"):
             name = os.path.basename(path)
             fp = os.path.join(OUT if path.startswith("/outputs/") else MB_ASSETS, name)
@@ -239,6 +390,11 @@ class H(BaseHTTPRequestHandler):
     def do_POST(self):
         req = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
         m = re.match(r"^/api/moodboards/([\w-]+)(/upload)?$", self.path)
+        if self.path == "/api/outputs/restore":
+            return self._send(*restore_outputs(req.get("files", [])))
+        star = re.match(r"^/api/outputs/([\w.-]+)/star$", self.path)
+        if star:
+            return self._send(*star_output(star.group(1), bool(req.get("starred"))))
         if self.path == "/api/moodboards":
             board = {"id": uuid.uuid4().hex[:10], "name": (req.get("name") or "Untitled moodboard").strip()[:80],
                      "created": time.time(), "updated": time.time(), "items": []}
@@ -255,16 +411,15 @@ class H(BaseHTTPRequestHandler):
             return self._send(404, {"error": "not found"})
         if not req.get("prompt", "").strip():
             return self._send(400, {"error": "Prompt is empty"})
-        code, payload = generate(req)
-        self._send(code, payload)
+        self._send(200, submit(req))
 
     def do_DELETE(self):
+        m = re.match(r"^/api/tasks/(\w+)$", self.path)
+        if m:
+            return self._send(*cancel(m.group(1)))
         if self.path.startswith("/api/outputs/"):
-            stem = os.path.splitext(os.path.basename(self.path))[0]
-            for ext in (".png", ".jpg", ".json"):
-                fp = os.path.join(OUT, stem + ext)
-                if os.path.isfile(fp):
-                    os.remove(fp)
+            empty_old_trash()
+            trash_output(self.path)
             return self._send(200, {"ok": True})
         m = re.match(r"^/api/moodboards/([\w-]+)$", self.path)
         if m:
@@ -284,10 +439,14 @@ class H(BaseHTTPRequestHandler):
         self._send(404, {"error": "not found"})
 
     def log_message(self, fmt, *args):
+        if "GET /api/tasks" in str(args[0] if args else ""):  # the page polls this every second
+            return
         sys.stderr.write("%s %s\n" % (time.strftime("%H:%M:%S"), fmt % args))
 
 
 if __name__ == "__main__":
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8765
+    empty_old_trash()
+    start_workers()
     print(f"Comfy Darkroom: http://127.0.0.1:{port}")
     ThreadingHTTPServer(("127.0.0.1", port), H).serve_forever()

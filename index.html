@@ -124,7 +124,8 @@ select { appearance:none; -webkit-appearance:none; cursor:pointer; padding-right
 @media (max-width:900px){ .imgs.n1 { max-width:none; } }
 .cell { position:relative; background:var(--ink-soft); border-radius:.75rem; overflow:hidden; }
 .cell.done { cursor:zoom-in; }
-.cell canvas.fx { position:absolute; inset:0; width:100%; height:100%; display:block; }
+.cell canvas.fx { position:absolute; inset:0; width:100%; height:100%; display:block; transition:opacity .4s; }
+.cell.waiting canvas.fx { opacity:.4; }
 .cell .img { position:relative; width:100%; height:100%; }
 .cell .img img { width:100%; height:100%; object-fit:cover; display:block; }
 .cell.pending .img { position:absolute; inset:0; }
@@ -133,6 +134,11 @@ select { appearance:none; -webkit-appearance:none; cursor:pointer; padding-right
   .cell .img.in img { opacity:1; filter:none; transform:none; }
 }
 .cell .status { position:absolute; left:.6rem; bottom:.6rem; background:rgba(20,14,24,.55); border-color:rgba(255,255,255,.14); }
+.cell .stop { position:absolute; right:.6rem; bottom:.6rem; background:rgba(20,14,24,.85); color:var(--warm-white); border:1px solid var(--t20); border-radius:.6rem; font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; padding:.35rem .6rem; cursor:pointer; opacity:0; transition:opacity .15s; }
+.cell:hover .stop, .cell .stop:focus-visible { opacity:1; }
+@media (hover:none){ .cell .stop { opacity:1; } }
+.cell .stop:hover { background:var(--warm-white); color:var(--ink); }
+.dot.off { background:var(--muted); }
 .cell .hover { position:absolute; inset:auto 0 0 0; padding:.55rem; display:flex; gap:.35rem; justify-content:flex-end; opacity:0; transition:opacity .15s; background:linear-gradient(transparent,rgba(0,0,0,.6)); }
 .cell:hover .hover, .cell:focus-within .hover { opacity:1; }
 @media (hover:none){ .cell .hover { opacity:1; } }
@@ -140,6 +146,18 @@ select { appearance:none; -webkit-appearance:none; cursor:pointer; padding-right
 .hover button:hover,.hover a:hover { background:var(--warm-white); color:var(--ink); }
 .cell .seedtag { position:absolute; top:.5rem; left:.5rem; font-size:.72rem; font-weight:400; color:var(--warm-white); background:rgba(20,14,24,.75); border-radius:.5rem; padding:.15rem .45rem; opacity:0; transition:opacity .15s; }
 .cell:hover .seedtag { opacity:1; }
+.star { position:absolute; top:.45rem; right:.45rem; width:32px; height:32px; border-radius:.6rem; border:1px solid var(--t20); background:rgba(20,14,24,.75); color:var(--warm-white); cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center; opacity:0; transition:opacity .15s; }
+.star svg { width:17px; height:17px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linejoin:round; }
+.cell:hover .star, .star:focus-visible, .star.on { opacity:1; }
+@media (hover:none){ .star { opacity:1; } }
+.star:hover { background:var(--warm-white); color:var(--ink); }
+.star.on { color:var(--yellow); }
+.star.on svg { fill:currentColor; }
+.star.on:hover { background:rgba(20,14,24,.75); color:var(--yellow); }
+.tile .badge-star { position:absolute; left:.5rem; bottom:.5rem; width:20px; height:20px; color:var(--yellow); filter:drop-shadow(0 1px 2px rgba(0,0,0,.6)); display:none; }
+.tile .badge-star svg { width:100%; height:100%; fill:currentColor; }
+.tile.starred .badge-star { display:block; }
+.btn.on { background:var(--warm-white); color:var(--ink); border-color:var(--warm-white); }
 .cell.err { display:flex; flex-direction:column; align-items:flex-start; justify-content:center; gap:.55rem; padding:1.25rem; overflow:auto; }
 .cell.err .et { color:var(--warm-white); font-weight:400; font-size:1rem; }
 .cell.err .em { font-size:.88rem; font-weight:400; color:var(--muted); line-height:1.4; }
@@ -189,13 +207,18 @@ kbd { font-family:inherit; font-size:.78rem; font-weight:700; color:var(--warm-w
 .lb .nav:disabled { opacity:.25; cursor:default; background:rgba(20,14,24,.8); color:var(--warm-white); }
 .lb .prev { left:1rem; } .lb .next { right:1rem; }
 .lb .cap { display:flex; gap:1rem; align-items:center; justify-content:space-between; padding:.75rem 1.5rem 1.25rem; flex-wrap:wrap; }
-.lb .cap .p { font-size:.95rem; font-weight:400; color:var(--canvas); max-width:60rem; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+.lb .cap .info { flex:1 1 30rem; min-width:0; max-width:60rem; }
+.lb .cap .p { font-size:.95rem; font-weight:400; color:var(--canvas); overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+.lb .cap .chips { margin-top:.5rem; }
 .lb .cap .acts { margin:0; }
 @media (max-width:700px){ .lb .stage { padding:1rem .5rem .5rem; } .lb .nav { top:auto; bottom:.5rem; transform:none; } }
 
 /* toast */
 .toast { position:fixed; left:50%; bottom:1.5rem; transform:translate(-50%,1rem); background:var(--warm-white); color:var(--ink); font-weight:400; font-size:.95rem; border-radius:1rem; padding:.7rem 1.1rem; opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; z-index:50; max-width:90vw; }
 .toast.show { opacity:1; transform:translate(-50%,0); }
+.toast.show.act { pointer-events:auto; display:flex; align-items:center; gap:1rem; padding:.45rem .5rem .45rem 1.1rem; }
+.toast button { font-size:.72rem; font-weight:800; text-transform:uppercase; letter-spacing:.05em; border-radius:.75rem; padding:.45rem .75rem; cursor:pointer; border:0; background:var(--ink); color:var(--warm-white); }
+.toast button:hover { background:var(--ink-light); }
 
 /* ---------- tabs + views ---------- */
 .tabs { display:flex; gap:.2rem; }
@@ -227,6 +250,8 @@ kbd { font-family:inherit; font-size:.78rem; font-weight:700; color:var(--warm-w
 .page-head { display:flex; align-items:flex-end; justify-content:space-between; gap:1rem 2rem; flex-wrap:wrap; margin:.5rem 0 1.5rem; }
 .page-head h2 { font-weight:300; font-size:clamp(1.9rem,3.2vw,2.6rem); letter-spacing:-.025em; margin:0; color:var(--canvas); }
 .page-head .sub { font-size:.95rem; font-weight:400; color:var(--muted); margin-top:.4rem; max-width:40rem; line-height:1.45; }
+.page-head .sub.usage { font-size:.85rem; margin-top:.2rem; }
+.page-head .sub.usage:empty { display:none; }
 .page-tools { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
 .page-tools input { width:16rem; }
 .page-tools .btn { height:2.75rem; }
@@ -381,17 +406,20 @@ body.drag[data-drop="board"]::after { content:"Drop to add to this moodboard"; }
 </div>
 
 <div class="feed" id="feed"></div>
+<div id="feed-more"></div>
 </div>
 
 <div class="view page" id="view-organize" hidden>
   <div class="page-head">
-    <div><h2>Organize</h2><div class="sub" id="org-sub"></div></div>
+    <div><h2>Organize</h2><div class="sub" id="org-sub"></div><div class="sub usage" id="org-usage"></div></div>
     <div class="page-tools" id="org-tools">
       <input type="text" id="org-q" placeholder="Search prompts" aria-label="Search prompts">
+      <button class="btn" id="org-starred" aria-pressed="false" title="Show only starred images"><span class="tc">Starred</span></button>
       <button class="btn" id="org-all"><span class="tc">Select all</span></button>
     </div>
   </div>
   <div class="org-grid" id="org-grid"></div>
+  <div id="org-more"></div>
   <div class="empty-note" id="org-empty" hidden><h3>Nothing here yet</h3>Everything you generate lands here, ready to sort into moodboards.</div>
 </div>
 
@@ -400,6 +428,7 @@ body.drag[data-drop="board"]::after { content:"Drop to add to this moodboard"; }
 <div class="selbar" id="selbar" hidden>
   <span class="n" id="seln"></span>
   <button class="btn" id="sel-mood"><span class="tc">Add to moodboard</span></button>
+  <button class="btn" id="sel-star"><span class="tc">Star</span></button>
   <button class="btn quiet" id="sel-del"><span class="tc">Delete</span></button>
   <button class="btn quiet" id="sel-clear"><span class="tc">Clear</span></button>
 </div>
@@ -412,8 +441,11 @@ body.drag[data-drop="board"]::after { content:"Drop to add to this moodboard"; }
     <button class="nav next" id="lbnext" aria-label="Next image">›</button>
   </div>
   <div class="cap">
-    <div class="p" id="lbp"></div>
+    <div class="info"><div class="p" id="lbp"></div><div class="chips" id="lbchips"></div></div>
     <div class="acts">
+      <button class="btn" id="lbcopy" title="Copy the prompt to the clipboard"><span class="tc">Copy prompt</span></button>
+      <button class="btn" id="lbreuse" title="Load this image’s prompt, settings and seed into the bar"><span class="tc">Use these settings</span></button>
+      <button class="btn" id="lbstar"><span class="tc">Star</span></button>
       <button class="btn" id="lbedit"><span class="tc">Edit</span></button>
       <button class="btn" id="lbmood" data-menu-anchor><span class="tc">+ Moodboard</span></button>
       <a class="btn" id="lbdl" download><span class="tc">Download</span></a>
@@ -567,6 +599,21 @@ const ta = $('#prompt');
 ta.addEventListener('input', () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 160) + 'px'; });
 ta.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); generate(); } });
 $('#go').onclick = () => generate();
+// ↑ and ↓ in an empty prompt (or one showing a past prompt) step through earlier prompts, newest first.
+let histAt = -1;
+ta.addEventListener('keydown', e => {
+  if ((e.key !== 'ArrowUp' && e.key !== 'ArrowDown') || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.isComposing) return;
+  const past = [...new Set(state.jobs.map(j => j.settings.prompt).filter(Boolean))];
+  const browsing = histAt >= 0 && ta.value === past[histAt];
+  if (ta.value && !browsing) return;   // leave what's being typed alone
+  e.preventDefault();
+  const next = e.key === 'ArrowUp' ? (browsing ? histAt + 1 : 0) : (browsing ? histAt - 1 : -1);
+  if (next >= past.length) return;
+  histAt = next;
+  ta.value = next < 0 ? '' : past[next];
+  ta.dispatchEvent(new Event('input'));
+  ta.setSelectionRange(ta.value.length, ta.value.length);
+});
 
 // The request shape the server expects (Router field names).
 function requestFrom(s, prompt) {
@@ -575,6 +622,7 @@ function requestFrom(s, prompt) {
 }
 async function generate(req = requestFrom(state.S, ta.value.trim()), inputs = state.inputs, runs = state.S.runs, boardId = state.activeBoard) {
   if (!req.prompt) { ta.focus(); toast('Describe the image first.'); return; }
+  askToNotify();
   const board = boardById(boardId)?.items.length ? boardById(boardId) : null;
   const baseSeed = req.seed === '' || req.seed == null ? Math.floor(Math.random() * 2147483000) : +req.seed;
   const jobId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -595,19 +643,67 @@ async function generate(req = requestFrom(state.S, ta.value.trim()), inputs = st
   const moodReq = sheets.length ? { ...mood, sheets: sheets.length } : undefined;
   job.slots.forEach((slot, i) => {
     slot.req = { ...req, seed: baseSeed + i, jobId, run: i, runs, images, moodboard: moodReq, inputCount: undefined };
-    runSlot(slot);   // all runs fire at once; the server is threaded, so they hit Router in parallel
+    runSlot(slot);
   });
 }
+// Each image is a task on the server, which runs at most 8 at a time and queues the rest.
+// The page hands tasks over, then one poll loop collects progress for all of them.
+const UNREACHABLE = { title: 'Can’t reach Darkroom', message: 'The local server isn’t answering. Is server.py still running?' };
 function runSlot(slot) {
-  Object.assign(slot, { status: 'pending', started: Date.now(), error: null });
+  Object.assign(slot, { status: 'pending', phase: 'sending', started: Date.now(), taskId: null, cancelled: false, title: null, message: null, detail: null });
   fetch('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(slot.req) })
     .then(r => r.json().catch(() => ({ error: `Server HTTP ${r.status}` })))
-    .then(res => {
-      if (res.items && res.items.length) Object.assign(slot, { status: 'done', item: res.items[res.items.length - 1] });
-      else Object.assign(slot, { status: 'error', ...friendlyError(res) });
+    .then(t => {
+      if (slot.cancelled) return t.id && fetch('/api/tasks/' + t.id, { method: 'DELETE' });   // cancelled while it was being sent
+      if (!t.id) return Object.assign(slot, { status: 'error', ...friendlyError(t) });
+      slot.taskId = t.id;
+      applyTask(slot, t);
     })
-    .catch(err => Object.assign(slot, { status: 'error', title: 'Can’t reach Darkroom', message: 'The local server isn’t answering. Is server.py still running?', detail: String(err) }))
-    .finally(render);
+    .catch(err => slot.cancelled || Object.assign(slot, { status: 'error', ...UNREACHABLE, detail: String(err) }))
+    .finally(() => { render(); poll(); });
+}
+// A queued image is dropped before Router sees it. One already developing still finishes on
+// Router's side (and is billed); the server just doesn't save it.
+function cancelSlot(sl) {
+  if (sl.taskId) fetch('/api/tasks/' + sl.taskId, { method: 'DELETE' }).catch(() => {});
+  const billed = sl.phase !== 'queued';
+  Object.assign(sl, { status: 'error', cancelled: true, title: billed ? 'Stopped' : 'Cancelled before it started',
+    message: billed ? 'Router may still finish this one and bill for it, but it won’t be saved.' : 'Nothing was billed.', detail: '' });
+}
+function applyTask(sl, t) {
+  if (t.status === 'queued') Object.assign(sl, { phase: 'queued', ahead: t.ahead });
+  else if (t.status === 'running') {
+    if (sl.phase !== 'running') sl.started = Date.now() - t.elapsed * 1000;
+    sl.phase = 'running';
+  }
+  else if (t.status === 'done') Object.assign(sl, { status: 'done', item: t.result.items[t.result.items.length - 1] });
+  else if (t.status === 'error') Object.assign(sl, { status: 'error', ...friendlyError(t.result || {}) });
+}
+const liveSlots = () => state.jobs.flatMap(j => j.slots.filter(s => s.status === 'pending'));
+let polling = false;
+async function poll() {
+  if (polling) return;
+  polling = true;
+  try {
+    while (liveSlots().length) {
+      await new Promise(r => setTimeout(r, 1000));
+      const tasks = await fetch('/api/tasks').then(r => r.json()).catch(() => null);
+      if (!tasks) continue;   // server briefly unreachable: keep waiting
+      const byId = new Map(tasks.map(t => [t.id, t]));
+      for (const sl of liveSlots()) {
+        if (!sl.taskId) continue;
+        const t = byId.get(sl.taskId);
+        if (t) applyTask(sl, t);
+        else Object.assign(sl, { status: 'error', title: 'Darkroom restarted', message: 'The server restarted before this image finished. Try again.' });
+      }
+      render();
+    }
+  } finally { polling = false; }
+}
+function slotLabel(sl) {
+  if (sl.phase === 'running') return `Developing ${((Date.now() - sl.started) / 1000).toFixed(0)}s`;
+  if (sl.phase === 'queued') return sl.ahead ? `In line · ${sl.ahead} ahead` : 'In line · next up';
+  return 'Sending';
 }
 // Turn Router and server failures into something a person can act on. Raw detail stays one click away.
 function friendlyError(res) {
@@ -618,14 +714,27 @@ function friendlyError(res) {
   if (err === 'No image returned') return { title: 'No image this time', message: res.text?.length ? 'The model replied with text instead. Try rephrasing, or ask for “an image of …”.' : 'The model finished without an image. Try again or rephrase.', detail };
   if (code === 401 || code === 403) return { title: 'API key rejected', message: 'Check COMFY_API_KEY in your .env file, then restart server.py.', detail };
   if (code === 402) return { title: 'Out of credits', message: 'This Comfy account needs more credits to keep generating.', detail };
-  if (code === 429) return { title: 'Too many requests', message: 'Router is rate limiting right now. Wait a moment, then try again.', detail };
+  const again = res.retried ? ' Darkroom already tried twice.' : '';
+  if (code === 429) return { title: 'Too many requests', message: 'Router is rate limiting right now.' + again + ' Wait a moment, then try again.', detail };
   if (code === 400) return { title: 'Settings not accepted', message: 'The model didn’t accept this combination. Try another shape, resolution or planning level.', detail };
   if (err === 'TimeoutError' || /timed out/i.test(detail)) return { title: 'Took too long', message: 'The request timed out. Try again, or use a lower resolution.', detail };
-  return { title: 'Something went wrong', message: 'Comfy Router couldn’t finish this image. Try again.', detail: detail || err };
+  return { title: 'Something went wrong', message: 'Comfy Router couldn’t finish this image.' + again + ' Try again.', detail: detail || err };
 }
 
 let toastTimer = 0;
-function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2800); }
+// toast('Saved.') or toast('Deleted 4 images.', { action: 'Undo', onAction }) — with an action it stays up longer.
+function toast(msg, { action, onAction } = {}) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.toggle('act', !!action);
+  if (action) {
+    const b = document.createElement('button'); b.textContent = action;
+    b.onclick = () => { t.classList.remove('show'); onAction(); };
+    t.appendChild(b);
+  }
+  t.classList.add('show'); clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), action ? 8000 : 2800);
+}
 
 
 // ---------- views ----------
@@ -639,6 +748,7 @@ function route() {
   if (state.view !== 'organize') clearSelection();
   if (state.view === 'organize') renderOrganize();
   if (state.view === 'moodboards') renderBoards();
+  requestAnimationFrame(loadMore);
   document.body.dataset.drop = state.boardOpen ? 'board' : '';
 }
 function go(h) { if (location.hash.slice(1) !== h) location.hash = h; else route(); window.scrollTo(0, 0); }
@@ -831,15 +941,30 @@ $('#mbfile').onchange = e => { if (state.boardOpen) uploadToBoard(state.boardOpe
 // ---------- organize ----------
 state.sel = new Set();
 let lastPicked = -1;
-const orgItems = () => { const q = $('#org-q').value.trim().toLowerCase(); return doneSlots().filter(s => !q || (s.item.settings?.prompt || '').toLowerCase().includes(q)); };
+let starredOnly = false;
+const orgItems = () => {
+  const q = $('#org-q').value.trim().toLowerCase();
+  return doneSlots().filter(s => (!starredOnly || s.item.starred) && (!q || (s.item.settings?.prompt || '').toLowerCase().includes(q)));
+};
 function renderOrganize() {
   const items = orgItems(), total = doneSlots().length;
   $('#org-sub').textContent = total ? `${total} image${total === 1 ? '' : 's'}. Select some to add them to a moodboard.` : '';
+  $('#org-usage').textContent = usageLine();
   $('#org-empty').hidden = total > 0;
   $('#org-tools').hidden = !total;
-  $('#org-grid').innerHTML = items.map(s => `<div class="tile ${state.sel.has(s.item.file) ? 'sel' : ''}" data-f="${s.item.file}" title="${esc(s.item.settings?.prompt || '')}">
-    <img loading="lazy" src="/outputs/${s.item.file}" alt=""><span class="tick"></span><button class="zoom" aria-label="View larger" title="View larger">⤢</button></div>`).join('');
+  $('#org-grid').innerHTML = items.slice(0, orgLimit).map(s => `<div class="tile ${state.sel.has(s.item.file) ? 'sel' : ''} ${s.item.starred ? 'starred' : ''}" data-f="${s.item.file}" title="${esc(s.item.settings?.prompt || '')}">
+    <img loading="lazy" src="/outputs/${s.item.file}" alt=""><span class="tick"></span><span class="badge-star"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg></span><button class="zoom" aria-label="View larger" title="View larger">⤢</button></div>`).join('');
   syncSelbar();
+}
+// Router reports token usage for every image (stats.usage). Credits are billed per token, so this is
+// a rough gauge of spend. It counts the images on disk, not failed or cancelled ones.
+const fmtTokens = n => n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? (n / 1e3).toFixed(1) + 'k' : String(n);
+function usageLine() {
+  const today = new Date().setHours(0, 0, 0, 0) / 1000;
+  const sum = list => list.reduce((t, s) => t + (s.item.stats?.usage?.totalTokenCount || 0), 0);
+  const all = doneSlots(), tod = all.filter(s => s.item.created >= today);
+  if (!sum(all)) return '';
+  return `Today: ${tod.length} image${tod.length === 1 ? '' : 's'}, ${fmtTokens(sum(tod))} tokens · All time: ${fmtTokens(sum(all))} tokens`;
 }
 function syncSelbar() {
   const n = state.sel.size;
@@ -848,6 +973,8 @@ function syncSelbar() {
   $('#org-grid').classList.toggle('selecting', n > 0);
   const vis = orgItems();
   $('#org-all').querySelector('.tc').textContent = vis.length && vis.every(s => state.sel.has(s.item.file)) ? 'Clear selection' : 'Select all';
+  const picked = doneSlots().filter(s => state.sel.has(s.item.file));
+  $('#sel-star').querySelector('.tc').textContent = picked.length && picked.every(s => s.item.starred) ? 'Unstar' : 'Star';
 }
 function clearSelection() { state.sel.clear(); document.querySelectorAll('.tile.sel').forEach(t => t.classList.remove('sel')); syncSelbar(); }
 $('#org-grid').onclick = e => {
@@ -866,6 +993,15 @@ $('#org-grid').onclick = e => {
   syncSelbar();
 };
 $('#org-q').oninput = () => renderOrganize();
+$('#org-starred').onclick = () => {
+  starredOnly = !starredOnly;
+  $('#org-starred').classList.toggle('on', starredOnly); $('#org-starred').setAttribute('aria-pressed', starredOnly);
+  clearSelection(); renderOrganize();
+};
+$('#sel-star').onclick = () => {
+  const picked = doneSlots().filter(s => state.sel.has(s.item.file));
+  setStarred(picked.map(s => s.item.file), !picked.every(s => s.item.starred));
+};
 $('#org-all').onclick = () => {
   const vis = orgItems();
   if (vis.length && vis.every(s => state.sel.has(s.item.file))) clearSelection();
@@ -878,21 +1014,59 @@ $('#sel-mood').onclick = () => {
   const srcs = [...state.sel].map(f => 'outputs/' + f);
   pickBoard($('#sel-mood'), async (id, name) => { await addImagesTo(srcs, id, name); clearSelection(); });
 };
-$('#sel-del').onclick = async () => {
-  const files = [...state.sel];
-  if (!confirm(`Delete ${files.length === 1 ? 'this image' : `these ${files.length} images`} from disk?`)) return;
+$('#sel-del').onclick = async () => { const files = [...state.sel]; clearSelection(); await deleteImages(files); };
+// Deleting moves images to the server's trash, so a toast can offer Undo instead of asking first.
+async function deleteImages(all) {
+  const starred = new Set(doneSlots().filter(s => s.item.starred).map(s => s.item.file));
+  const files = all.filter(f => !starred.has(f)), kept = all.length - files.length;
+  if (!files.length) return toast(kept === 1 ? 'That image is starred. Unstar it to delete it.' : 'Those images are starred. Unstar them to delete them.');
+  const snap = new Map(state.jobs.map(j => [j, j.slots.slice()]));
   await Promise.all(files.map(f => fetch('/api/outputs/' + f, { method: 'DELETE' })));
   removeFiles(new Set(files));
-  clearSelection(); renderOrganize();
-  toast(`Deleted ${files.length === 1 ? '1 image' : files.length + ' images'}.`);
-};
-// Drop deleted images from the feed: rows lose those images, empty rows go away.
+  if (state.view === 'organize') renderOrganize();
+  toast(`Deleted ${files.length === 1 ? '1 image' : files.length + ' images'}.${kept ? ` Kept ${kept} starred.` : ''}`, { action: 'Undo', onAction: () => undoDelete(snap) });
+}
+async function undoDelete(snap) {
+  let back;
+  try { back = new Set((await api('/api/outputs/restore', { files: [...snap.values()].flat().filter(sl => sl.status === 'done').map(sl => sl.item.file) })).items.map(i => i.file)); }
+  catch (err) { return toast('Couldn’t undo: ' + err.message); }
+  // Put rows and images back where they were. Rows made since then stay on top.
+  const fresh = state.jobs.filter(j => !snap.has(j));
+  for (const [job, before] of snap) {
+    const now = job.slots, slots = before.filter(sl => now.includes(sl) || (sl.status === 'done' && back.has(sl.item.file)));
+    if (slots.length !== now.length || !state.jobs.includes(job)) { job.el?.remove(); job.el = null; }
+    job.slots = slots;
+  }
+  state.jobs = [...fresh, ...[...snap.keys()].filter(j => j.slots.length)];
+  state.boards = await fetch('/api/moodboards').then(r => r.json()).catch(() => state.boards);
+  syncMoodButton(); render();
+  if (state.view === 'organize') renderOrganize();
+  if (state.view === 'moodboards') renderBoards();
+  toast(`Restored ${back.size === 1 ? '1 image' : back.size + ' images'}.`);
+}
+// Starred images are skipped by Delete until they're unstarred. The flag lives in each image's .json.
+async function setStarred(files, on) {
+  const bySlot = new Map(doneSlots().map(s => [s.item.file, s]));
+  files.forEach(f => { const s = bySlot.get(f); if (s) s.item.starred = on || undefined; });
+  syncStars();
+  const ok = await Promise.all(files.map(f => api(`/api/outputs/${f}/star`, { starred: on }).then(() => true, () => false)));
+  if (ok.includes(false)) toast('Couldn’t save every star. Try again.');
+  else if (files.length > 1) toast(`${on ? 'Starred' : 'Unstarred'} ${files.length} images.`);
+}
+function syncStars() {
+  const starred = new Set(doneSlots().filter(s => s.item.starred).map(s => s.item.file));
+  document.querySelectorAll('.star[data-star]').forEach(b => { const on = starred.has(b.dataset.star); b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+  if (lb) { $('#lbstar').querySelector('.tc').textContent = lb.item.starred ? '★ Starred' : 'Star'; $('#lbstar').classList.toggle('on', !!lb.item.starred); }
+  document.querySelectorAll('#org-grid .tile').forEach(t => t.classList.toggle('starred', starred.has(t.dataset.f)));
+  if (state.view === 'organize') { if (starredOnly) renderOrganize(); else syncSelbar(); }
+}
+// Drop deleted images from the feed: rows lose those images, and rows left with only failed tiles go away.
 function removeFiles(gone) {
   state.jobs = state.jobs.filter(job => {
     const keep = job.slots.filter(s => !(s.status === 'done' && gone.has(s.item.file)));
     if (keep.length === job.slots.length) return true;
     job.el?.remove(); job.el = null; job.slots = keep;
-    return keep.length > 0;
+    return keep.some(s => s.status === 'done' || s.status === 'pending');
   });
   state.boards.forEach(b => { b.items = b.items.filter(i => !gone.has(i.replace(/^outputs\//, ''))); });
   render();
@@ -975,6 +1149,25 @@ function chipsFor(job) {
     new Date(job.created * 1000).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }),
   ].filter(Boolean).map(c => `<span class="chip">${esc(c)}</span>`).join('');
 }
+// One image's settings, for the lightbox.
+function itemChips(it) {
+  const s = it.settings || {};
+  return [
+    modelName(s.model), s.moodboard ? `Moodboard · ${s.moodboard.name}` : null, s.aspectRatio && shapeName(s.aspectRatio),
+    MODEL_INFO[s.model]?.noSize ? null : s.imageSize, s.seed != null && s.seed !== '' ? `Seed ${s.seed}` : null,
+    s.temperature != null && s.temperature !== 1 ? `Creativity ${creativityWord(s.temperature).toLowerCase()} (${s.temperature})` : null,
+    s.thinkingLevel ? `${planningName(s.thinkingLevel)} planning` : null, s.system ? 'Style notes on' : null,
+    it.stats?.seconds ? `${it.stats.seconds}s` : null,
+    new Date(it.created * 1000).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }),
+  ].filter(Boolean).map(c => `<span class="chip">${esc(c)}</span>`).join('');
+}
+// Save as "fox-reading-a-map-in-a_s1234.png" rather than the timestamp name on disk.
+function dlName(it) {
+  const slug = (it.settings?.prompt || '').toLowerCase().normalize('NFKD').replace(/[^a-z0-9\s-]/g, '').trim()
+    .split(/[\s-]+/).slice(0, 6).join('-').slice(0, 48).replace(/-+$/, '') || 'darkroom';
+  const seed = it.settings?.seed;
+  return slug + (seed != null && seed !== '' ? '_s' + seed : '') + it.file.slice(it.file.lastIndexOf('.'));
+}
 function buildJob(job) {
   const s = job.settings, el = document.createElement('section');
   el.className = 'job'; el.dataset.job = job.jobId;
@@ -988,7 +1181,8 @@ function buildJob(job) {
       <div class="acts">
         <button class="btn" data-a="rerun" title="Same prompt and settings, new seeds"><span class="tc">Run again</span></button>
         <button class="btn" data-a="reuse" title="Load this prompt and settings into the bar above"><span class="tc">Use these settings</span></button>
-        <button class="btn quiet" data-a="delete" title="Delete these images from disk"><span class="tc">Delete</span></button>
+        <button class="btn quiet" data-a="cancelall" title="Stop the images still waiting or developing" hidden><span class="tc">Cancel</span></button>
+        <button class="btn quiet" data-a="delete" title="Delete this row's images"><span class="tc">Delete</span></button>
       </div>
     </div>`;
   const imgs = el.querySelector('.imgs');
@@ -1005,7 +1199,8 @@ function buildJob(job) {
 function showPending(sl, s) {
   const cell = sl.el;
   cell.className = 'cell pending'; cell.style.aspectRatio = AR[s.aspectRatio] || '1/1';
-  cell.innerHTML = `<canvas class="fx"></canvas><span class="status pill"><span class="dot"></span><span class="tc">Developing <span data-t="${sl.started}">0s</span></span></span>`;
+  cell.innerHTML = `<canvas class="fx"></canvas><span class="status pill"><span class="dot"></span><span class="tc lbl">${slotLabel(sl)}</span></span>
+    <button class="stop" data-a="cancel" title="Stop this image"><span class="tc">Cancel</span></button>`;
   Shader.add(cell.querySelector('canvas'), arNum(s.aspectRatio), sl.seed ?? +cell.dataset.s);
   sl.shown = 'pending';
 }
@@ -1014,11 +1209,12 @@ function fillDone(sl, animate) {
   const wrap = document.createElement('div'); wrap.className = 'img' + (animate ? '' : ' in');
   wrap.innerHTML = `<img src="/outputs/${f}" alt="${esc(sl.item.settings?.prompt || '')}">
     <span class="seedtag">Seed ${sl.seed ?? sl.item.settings.seed ?? '?'} · ${sl.item.stats?.seconds ?? '?'}s</span>
+    <button class="star ${sl.item.starred ? 'on' : ''}" data-a="star" data-star="${f}" aria-pressed="${!!sl.item.starred}" title="Star: keeps it safe from Delete"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg></button>
     <div class="hover">
       <button data-a="input" data-f="${f}" title="Add as a reference, then describe the change">Edit</button>
       <button data-a="vary" title="New images from this one, same prompt">Variations</button>
       <button data-a="mood" data-f="${f}" data-menu-anchor title="Add to a moodboard">+ Moodboard</button>
-      <a href="/outputs/${f}" download="${f}" title="Download">Download</a>
+      <a href="/outputs/${f}" download="${esc(dlName(sl.item))}" title="Download">Download</a>
     </div>`;
   const img = wrap.querySelector('img');
   cell.appendChild(wrap);
@@ -1037,19 +1233,28 @@ function fillError(sl) {
   const cell = sl.el, fx = cell.querySelector('canvas.fx');
   if (fx) Shader.remove(fx);
   cell.className = 'cell err';
-  cell.innerHTML = `<span class="pill"><span class="dot fail"></span><span class="tc">Failed</span></span>
+  cell.innerHTML = `<span class="pill"><span class="dot ${sl.cancelled ? 'off' : 'fail'}"></span><span class="tc">${sl.cancelled ? 'Cancelled' : 'Failed'}</span></span>
     <div class="et">${esc(sl.title || 'Something went wrong')}</div>
     <div class="em">${esc(sl.message || '')}</div>
-    <button class="btn" data-a="retry"><span class="tc">Try again</span></button>
+    ${sl.req ? '<button class="btn" data-a="retry"><span class="tc">Try again</span></button>' : ''}
     ${sl.detail ? `<details><summary>Details</summary><pre>${esc(sl.detail)}</pre></details>` : ''}`;
 }
 function render() {
   $('#empty').hidden = state.jobs.length > 0;
-  const feed = $('#feed');
-  state.jobs.forEach((job, i) => {
+  ta.placeholder = state.jobs.length ? 'Describe an image, or press ↑ for an earlier prompt' : 'Describe an image';
+  const live = liveSlots().length;
+  document.title = live ? `(${live}) Comfy Darkroom` : 'Comfy Darkroom';
+  const feed = $('#feed'), shown = state.jobs.slice(0, feedLimit);
+  state.jobs.forEach(job => {   // every row, shown or not, so notifications still fire
+    const busy = job.slots.some(x => x.status === 'pending');
+    if (job.busy && !busy) notifyDone(job);
+    job.busy = busy;
+  });
+  shown.forEach((job, i) => {
     if (!job.el) buildJob(job);
     if (feed.children[i] !== job.el) feed.insertBefore(job.el, feed.children[i] || null);
     job.el.querySelector('.chips').innerHTML = chipsFor(job);
+    job.el.querySelector('[data-a="cancelall"]').hidden = !job.slots.some(x => x.status === 'pending');
     job.slots.forEach(sl => {
       if (sl.shown === sl.status) return;
       if (sl.status === 'pending') showPending(sl, job.settings);
@@ -1058,10 +1263,43 @@ function render() {
       sl.shown = sl.status;
     });
   });
-  while (feed.children.length > state.jobs.length) feed.lastElementChild.remove();
+  while (feed.children.length > shown.length) feed.lastElementChild.remove();
   tick();
 }
-function tick() { document.querySelectorAll('[data-t]').forEach(el => el.textContent = ((Date.now() - +el.dataset.t) / 1000).toFixed(0) + 's'); }
+// Long histories render a page at a time: rows in the feed, tiles in Organize. More load on scroll.
+const FEED_PAGE = 24, ORG_PAGE = 240;
+let feedLimit = FEED_PAGE, orgLimit = ORG_PAGE;
+const nearBottom = el => el.getBoundingClientRect().top < innerHeight + 1500;
+function loadMore() {
+  if (state.view === 'create' && feedLimit < state.jobs.length && nearBottom($('#feed-more'))) { feedLimit += FEED_PAGE; render(); requestAnimationFrame(loadMore); }
+  if (state.view === 'organize' && orgLimit < orgItems().length && nearBottom($('#org-more'))) { orgLimit += ORG_PAGE; renderOrganize(); requestAnimationFrame(loadMore); }
+}
+window.addEventListener('scroll', loadMore, { passive: true });
+// When a row finishes while Darkroom is in a background tab, say so with a system notification.
+// Permission is asked once, on the first Generate, since browsers only allow it after a click or key.
+const NOTIFY_KEY = 'darkroom-notify-asked';
+function askToNotify() {
+  if (!('Notification' in window) || Notification.permission !== 'default') return;
+  try { if (localStorage.getItem(NOTIFY_KEY)) return; localStorage.setItem(NOTIFY_KEY, '1'); } catch { return; }
+  Notification.requestPermission().then(p => { if (p === 'granted') toast('Darkroom will let you know when images finish in a background tab.'); });
+}
+function notifyDone(job) {
+  if (!document.hidden || !('Notification' in window) || Notification.permission !== 'granted') return;
+  const done = job.slots.filter(x => x.status === 'done').length, failed = job.slots.filter(x => x.status === 'error' && !x.cancelled).length;
+  if (!done && !failed) return;
+  const p = job.settings.prompt || '';
+  const n = new Notification(done ? `${done} image${done > 1 ? 's' : ''} ready` : 'Images failed', {
+    body: (failed && done ? `${failed} failed. ` : '') + (p.length > 90 ? p.slice(0, 88) + '…' : p), tag: job.jobId,
+    icon: job.slots.find(x => x.status === 'done') ? '/outputs/' + job.slots.find(x => x.status === 'done').item.file : undefined });
+  n.onclick = () => { window.focus(); if (state.view !== 'create') go('create'); job.el?.scrollIntoView({ block: 'start' }); n.close(); };
+}
+function tick() {
+  liveSlots().forEach(sl => {
+    const l = sl.el?.querySelector('.status .lbl'); if (!l) return;
+    l.textContent = slotLabel(sl);
+    sl.el.classList.toggle('waiting', sl.phase !== 'running');
+  });
+}
 setInterval(tick, 1000);
 
 // Load a past row's prompt and settings back into the bar.
@@ -1087,6 +1325,9 @@ $('#feed').onclick = async e => {
     if (a === 'input') return useAsInput(btn.dataset.f);
     if (a === 'mood') return pickBoard(btn, (id, name) => addImagesTo(['outputs/' + btn.dataset.f], id, name));
     if (a === 'retry') { runSlot(sl); return render(); }
+    if (a === 'cancel') { cancelSlot(sl); return render(); }
+    if (a === 'star') return setStarred([sl.item.file], !sl.item.starred);
+    if (a === 'cancelall') { job.slots.filter(x => x.status === 'pending').forEach(cancelSlot); return render(); }
     if (a === 'reuse') { applySettings(job.settings); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
     if (a === 'rerun') {
       const refs = await Promise.all((job.refs || []).map(async url => ({ url, mime: url.slice(5, url.indexOf(';')), data: url.split(',')[1] })));
@@ -1098,11 +1339,11 @@ $('#feed').onclick = async e => {
       return generate({ ...job.settings, seed: '' }, [{ mime: blob.type, data: url.split(',')[1], url }], state.S.runs, job.settings.moodboard?.id);
     }
     if (a === 'delete') {
+      job.slots.filter(x => x.status === 'pending').forEach(cancelSlot);
       const files = job.slots.filter(x => x.status === 'done').map(x => x.item.file);
-      if (files.length && !confirm(`Delete ${files.length === 1 ? 'this image' : `these ${files.length} images`} from disk?`)) return;
-      await Promise.all(files.map(f => fetch('/api/outputs/' + f, { method: 'DELETE' })));
       job.slots.forEach(x => x.el?.querySelector('canvas.fx') && Shader.remove(x.el.querySelector('canvas.fx')));
-      state.jobs = state.jobs.filter(j => j !== job); job.el.remove(); render();
+      if (files.length) return deleteImages(files);
+      state.jobs = state.jobs.filter(j => j !== job); job.el.remove(); render();   // only failed or cancelled tiles: nothing to undo
       return;
     }
     return;
@@ -1119,7 +1360,9 @@ function openLb(sl) {
   const all = doneSlots(), i = all.indexOf(sl);
   $('#lbimg').src = '/outputs/' + sl.item.file;
   $('#lbp').textContent = sl.item.settings?.prompt || '';
-  $('#lbdl').href = '/outputs/' + sl.item.file; $('#lbdl').download = sl.item.file;
+  $('#lbchips').innerHTML = itemChips(sl.item);
+  syncStars();
+  $('#lbdl').href = '/outputs/' + sl.item.file; $('#lbdl').download = dlName(sl.item);
   $('#lbprev').disabled = i <= 0; $('#lbnext').disabled = i >= all.length - 1;
   $('#lb').classList.add('open');
 }
@@ -1128,6 +1371,9 @@ function closeLb() { $('#lb').classList.remove('open'); lb = null; }
 $('#lbx').onclick = closeLb;
 $('#lbprev').onclick = () => step(-1);
 $('#lbnext').onclick = () => step(1);
+$('#lbstar').onclick = () => setStarred([lb.item.file], !lb.item.starred);
+$('#lbcopy').onclick = () => navigator.clipboard.writeText(lb.item.settings?.prompt || '').then(() => toast('Prompt copied.'), () => toast('Couldn’t copy. Select the text instead.'));
+$('#lbreuse').onclick = () => { const s = lb.item.settings; closeLb(); if (state.view !== 'create') go('create'); applySettings(s); window.scrollTo({ top: 0, behavior: 'smooth' }); };
 $('#lbedit').onclick = () => { const f = lb.item.file; closeLb(); useAsInput(f); };
 $('#lbmood').onclick = () => { if (menuEl) return closeMenu(); const f = lb.item.file; pickBoard($('#lbmood'), (id, name) => addImagesTo(['outputs/' + f], id, name)); };
 $('#lbstage').onclick = e => { if (e.target.id === 'lbstage') closeLb(); };
@@ -1144,7 +1390,9 @@ function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;'
 $('#examples').innerHTML = EXAMPLES.map(([tag, p]) => `<button class="ex" data-p="${esc(p)}"><span class="tag">${tag}</span>${esc(p)}</button>`).join('');
 $('#examples').onclick = e => { const b = e.target.closest('.ex'); if (b) { ta.value = b.dataset.p; ta.dispatchEvent(new Event('input')); ta.focus(); } };
 
-Promise.all([fetch('/api/models').then(r => r.json()), fetch('/api/gallery').then(r => r.json()), fetch('/api/moodboards').then(r => r.json()).catch(() => [])]).then(([m, items, boards]) => {
+// Tasks are read before the gallery: one that finishes in between then shows up in both, never in neither.
+fetch('/api/tasks').then(r => r.json()).catch(() => []).then(live => Promise.all([fetch('/api/models').then(r => r.json()),
+  fetch('/api/gallery').then(r => r.json()), fetch('/api/moodboards').then(r => r.json()).catch(() => []), live])).then(([m, items, boards, live]) => {
   state.boards = boards;
   try { const id = localStorage.getItem(BOARD_KEY); if (boardById(id)) state.activeBoard = id; } catch {}
   syncMoodButton();
@@ -1158,9 +1406,20 @@ Promise.all([fetch('/api/models').then(r => r.json()), fetch('/api/gallery').the
     if (!byJob.has(id)) byJob.set(id, { jobId: id, settings: { ...it.settings }, created: it.created, slots: [] });
     byJob.get(id).slots.push({ status: 'done', item: it, seed: it.settings.seed, run: it.settings.run ?? 0 });
   }
+  // Images still queued or developing (say, after a reload) rejoin their rows and pick up polling.
+  for (const t of live.filter(t => t.status === 'queued' || t.status === 'running')) {
+    const s = t.settings, id = s.jobId || t.id;
+    if (!byJob.has(id)) byJob.set(id, { jobId: id, settings: { ...s, inputCount: Math.max(0, t.imageCount - (s.moodboard?.sheets || 0)) }, created: t.created, slots: [] });
+    const job = byJob.get(id);
+    if (job.slots.some(x => x.run === (s.run ?? 0))) continue;
+    const sl = { status: 'pending', taskId: t.id, seed: s.seed, run: s.run ?? 0, req: t.imageCount ? null : s };   // image data isn't kept, so no retry with references
+    applyTask(sl, t);
+    job.slots.push(sl);
+  }
   state.jobs = [...byJob.values()].map(j => { j.slots.sort((a, b) => a.run - b.run); j.settings.seed = j.slots[0].seed; return j; })
     .sort((a, b) => b.created - a.created);
   render();
+  poll();
   route();
   if (!state.jobs.length && state.view === 'create') ta.focus();
 });
