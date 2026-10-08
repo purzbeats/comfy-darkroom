@@ -134,6 +134,11 @@ select { appearance:none; -webkit-appearance:none; cursor:pointer; padding-right
   .cell .img.in img { opacity:1; filter:none; transform:none; }
 }
 .cell .status { position:absolute; left:.6rem; bottom:.6rem; background:rgba(20,14,24,.55); border-color:rgba(255,255,255,.14); }
+.cell .stop { position:absolute; right:.6rem; bottom:.6rem; background:rgba(20,14,24,.85); color:var(--warm-white); border:1px solid var(--t20); border-radius:.6rem; font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; padding:.35rem .6rem; cursor:pointer; opacity:0; transition:opacity .15s; }
+.cell:hover .stop, .cell .stop:focus-visible { opacity:1; }
+@media (hover:none){ .cell .stop { opacity:1; } }
+.cell .stop:hover { background:var(--warm-white); color:var(--ink); }
+.dot.off { background:var(--muted); }
 .cell .hover { position:absolute; inset:auto 0 0 0; padding:.55rem; display:flex; gap:.35rem; justify-content:flex-end; opacity:0; transition:opacity .15s; background:linear-gradient(transparent,rgba(0,0,0,.6)); }
 .cell:hover .hover, .cell:focus-within .hover { opacity:1; }
 @media (hover:none){ .cell .hover { opacity:1; } }
@@ -603,16 +608,25 @@ async function generate(req = requestFrom(state.S, ta.value.trim()), inputs = st
 // The page hands tasks over, then one poll loop collects progress for all of them.
 const UNREACHABLE = { title: 'Can’t reach Darkroom', message: 'The local server isn’t answering. Is server.py still running?' };
 function runSlot(slot) {
-  Object.assign(slot, { status: 'pending', phase: 'sending', started: Date.now(), taskId: null, title: null, message: null, detail: null });
+  Object.assign(slot, { status: 'pending', phase: 'sending', started: Date.now(), taskId: null, cancelled: false, title: null, message: null, detail: null });
   fetch('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(slot.req) })
     .then(r => r.json().catch(() => ({ error: `Server HTTP ${r.status}` })))
     .then(t => {
+      if (slot.cancelled) return t.id && fetch('/api/tasks/' + t.id, { method: 'DELETE' });   // cancelled while it was being sent
       if (!t.id) return Object.assign(slot, { status: 'error', ...friendlyError(t) });
       slot.taskId = t.id;
       applyTask(slot, t);
     })
-    .catch(err => Object.assign(slot, { status: 'error', ...UNREACHABLE, detail: String(err) }))
+    .catch(err => slot.cancelled || Object.assign(slot, { status: 'error', ...UNREACHABLE, detail: String(err) }))
     .finally(() => { render(); poll(); });
+}
+// A queued image is dropped before Router sees it. One already developing still finishes on
+// Router's side (and is billed); the server just doesn't save it.
+function cancelSlot(sl) {
+  if (sl.taskId) fetch('/api/tasks/' + sl.taskId, { method: 'DELETE' }).catch(() => {});
+  const billed = sl.phase !== 'queued';
+  Object.assign(sl, { status: 'error', cancelled: true, title: billed ? 'Stopped' : 'Cancelled before it started',
+    message: billed ? 'Router may still finish this one and bill for it, but it won’t be saved.' : 'Nothing was billed.', detail: '' });
 }
 function applyTask(sl, t) {
   if (t.status === 'queued') Object.assign(sl, { phase: 'queued', ahead: t.ahead });
@@ -658,10 +672,11 @@ function friendlyError(res) {
   if (err === 'No image returned') return { title: 'No image this time', message: res.text?.length ? 'The model replied with text instead. Try rephrasing, or ask for “an image of …”.' : 'The model finished without an image. Try again or rephrase.', detail };
   if (code === 401 || code === 403) return { title: 'API key rejected', message: 'Check COMFY_API_KEY in your .env file, then restart server.py.', detail };
   if (code === 402) return { title: 'Out of credits', message: 'This Comfy account needs more credits to keep generating.', detail };
-  if (code === 429) return { title: 'Too many requests', message: 'Router is rate limiting right now. Wait a moment, then try again.', detail };
+  const again = res.retried ? ' Darkroom already tried twice.' : '';
+  if (code === 429) return { title: 'Too many requests', message: 'Router is rate limiting right now.' + again + ' Wait a moment, then try again.', detail };
   if (code === 400) return { title: 'Settings not accepted', message: 'The model didn’t accept this combination. Try another shape, resolution or planning level.', detail };
   if (err === 'TimeoutError' || /timed out/i.test(detail)) return { title: 'Took too long', message: 'The request timed out. Try again, or use a lower resolution.', detail };
-  return { title: 'Something went wrong', message: 'Comfy Router couldn’t finish this image. Try again.', detail: detail || err };
+  return { title: 'Something went wrong', message: 'Comfy Router couldn’t finish this image.' + again + ' Try again.', detail: detail || err };
 }
 
 let toastTimer = 0;
@@ -1028,6 +1043,7 @@ function buildJob(job) {
       <div class="acts">
         <button class="btn" data-a="rerun" title="Same prompt and settings, new seeds"><span class="tc">Run again</span></button>
         <button class="btn" data-a="reuse" title="Load this prompt and settings into the bar above"><span class="tc">Use these settings</span></button>
+        <button class="btn quiet" data-a="cancelall" title="Stop the images still waiting or developing" hidden><span class="tc">Cancel</span></button>
         <button class="btn quiet" data-a="delete" title="Delete these images from disk"><span class="tc">Delete</span></button>
       </div>
     </div>`;
@@ -1045,7 +1061,8 @@ function buildJob(job) {
 function showPending(sl, s) {
   const cell = sl.el;
   cell.className = 'cell pending'; cell.style.aspectRatio = AR[s.aspectRatio] || '1/1';
-  cell.innerHTML = `<canvas class="fx"></canvas><span class="status pill"><span class="dot"></span><span class="tc lbl">${slotLabel(sl)}</span></span>`;
+  cell.innerHTML = `<canvas class="fx"></canvas><span class="status pill"><span class="dot"></span><span class="tc lbl">${slotLabel(sl)}</span></span>
+    <button class="stop" data-a="cancel" title="Stop this image"><span class="tc">Cancel</span></button>`;
   Shader.add(cell.querySelector('canvas'), arNum(s.aspectRatio), sl.seed ?? +cell.dataset.s);
   sl.shown = 'pending';
 }
@@ -1077,7 +1094,7 @@ function fillError(sl) {
   const cell = sl.el, fx = cell.querySelector('canvas.fx');
   if (fx) Shader.remove(fx);
   cell.className = 'cell err';
-  cell.innerHTML = `<span class="pill"><span class="dot fail"></span><span class="tc">Failed</span></span>
+  cell.innerHTML = `<span class="pill"><span class="dot ${sl.cancelled ? 'off' : 'fail'}"></span><span class="tc">${sl.cancelled ? 'Cancelled' : 'Failed'}</span></span>
     <div class="et">${esc(sl.title || 'Something went wrong')}</div>
     <div class="em">${esc(sl.message || '')}</div>
     ${sl.req ? '<button class="btn" data-a="retry"><span class="tc">Try again</span></button>' : ''}
@@ -1090,6 +1107,7 @@ function render() {
     if (!job.el) buildJob(job);
     if (feed.children[i] !== job.el) feed.insertBefore(job.el, feed.children[i] || null);
     job.el.querySelector('.chips').innerHTML = chipsFor(job);
+    job.el.querySelector('[data-a="cancelall"]').hidden = !job.slots.some(x => x.status === 'pending');
     job.slots.forEach(sl => {
       if (sl.shown === sl.status) return;
       if (sl.status === 'pending') showPending(sl, job.settings);
@@ -1133,6 +1151,8 @@ $('#feed').onclick = async e => {
     if (a === 'input') return useAsInput(btn.dataset.f);
     if (a === 'mood') return pickBoard(btn, (id, name) => addImagesTo(['outputs/' + btn.dataset.f], id, name));
     if (a === 'retry') { runSlot(sl); return render(); }
+    if (a === 'cancel') { cancelSlot(sl); return render(); }
+    if (a === 'cancelall') { job.slots.filter(x => x.status === 'pending').forEach(cancelSlot); return render(); }
     if (a === 'reuse') { applySettings(job.settings); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
     if (a === 'rerun') {
       const refs = await Promise.all((job.refs || []).map(async url => ({ url, mime: url.slice(5, url.indexOf(';')), data: url.split(',')[1] })));

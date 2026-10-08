@@ -41,6 +41,8 @@ TASKS = {}
 TASKS_LOCK = threading.Lock()
 LINE = queue.Queue()
 SEQ = itertools.count()  # place in line; time.time() can tie
+# Router answers worth one more try, and how long to wait first. Anything else fails straight away.
+RETRY_AFTER = {429: 8, 500: 4, 502: 4, 503: 4, 504: 4}
 
 # The page packs a moodboard into grid sheets and sends them after the user's own references.
 # This note tells the model how to read them; the user never sees it.
@@ -106,15 +108,25 @@ def generate(req, task=None):
     body = build_body(req)
     r = urllib.request.Request(ROUTER + req["model"], data=json.dumps(body).encode(), method="POST",
                                headers={"X-API-Key": KEY, "Content-Type": "application/json"})
-    t0 = time.time()
-    try:
-        with urllib.request.urlopen(r, timeout=600) as resp:
-            data, headers, status = json.load(resp), dict(resp.headers), resp.status
-    except urllib.error.HTTPError as e:
-        return {"error": f"Router HTTP {e.code}", "detail": e.read().decode()[:3000],
-                "seconds": round(time.time() - t0, 1)}
-    except Exception as e:  # timeout, DNS, etc.
-        return {"error": type(e).__name__, "detail": str(e), "seconds": round(time.time() - t0, 1)}
+    t0, retried = time.time(), False
+    while True:
+        try:
+            with urllib.request.urlopen(r, timeout=600) as resp:
+                data, headers, status = json.load(resp), dict(resp.headers), resp.status
+            break
+        except Exception as e:
+            http = isinstance(e, urllib.error.HTTPError)
+            # Rate limits, Router hiccups and dropped connections get one retry; timeouts don't.
+            transient = e.code in RETRY_AFTER if http else (
+                isinstance(e, (urllib.error.URLError, ConnectionError)) and not isinstance(getattr(e, "reason", e), TimeoutError))
+            if transient and not retried and not (task and task["status"] == "cancelled"):
+                retried = True
+                time.sleep(RETRY_AFTER.get(e.code, 4) if http else 4)
+                continue
+            if http:
+                return {"error": f"Router HTTP {e.code}", "detail": e.read().decode()[:3000],
+                        "seconds": round(time.time() - t0, 1), "retried": retried}
+            return {"error": type(e).__name__, "detail": str(e), "seconds": round(time.time() - t0, 1), "retried": retried}
     secs = round(time.time() - t0, 1)
     if task and task["status"] == "cancelled":  # Router finished (and billed), but the user stopped it
         return {"error": "Cancelled"}
@@ -138,7 +150,7 @@ def generate(req, task=None):
              "finishReason": [c.get("finishReason") for c in data.get("candidates", [])],
              "fallbackProvider": headers.get("X-Comfy-Router-Fallback-Provider"),
              "droppedParams": headers.get("X-Comfy-Router-Dropped-Params"),
-             "previewsDropped": len(thoughts) if finals else 0, "http": status}
+             "previewsDropped": len(thoughts) if finals else 0, "http": status, "retried": retried}
     if not images:
         return {"error": "No image returned", "text": texts, "stats": stats,
                 "promptFeedback": data.get("promptFeedback")}
