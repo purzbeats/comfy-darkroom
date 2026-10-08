@@ -2,19 +2,27 @@
 
 A local image playground for the Nano Banana models on [Comfy Router](https://docs.comfy.org). Describe an image, make up to four at once, and watch each set land as a row in a growing feed.
 
-![Comfy Darkroom with the settings panel open above a row of four Nano Banana 2.1 images](docs/feed.png)
+![Comfy Darkroom with the settings panel open above a row of four Nano Banana 2.1 images, one of them starred](docs/feed.png)
 
 - **Models:** Nano Banana 2.1 (default), Nano Banana 2, Nano Banana Pro, Nano Banana 2 Lite and Nano Banana, each with a one-line note on when to use it.
-- **Images:** make 1 to 4 per prompt. They run at the same time, each with its own seed.
+- **Images:** make 1 to 4 per prompt, each with its own seed. Up to 8 images develop at once; the rest wait their turn, so you can queue several prompts without flooding Router. A reload picks up images still in progress.
+- **Cancel:** stop one image or a whole row. One still waiting in line is dropped before it costs anything.
 - **References:** add images by button, drag and drop, or paste. They are numbered, so a prompt can say "the jacket from image 2". Any result can become a reference with **Edit**, or seed a new set with **Variations**.
 - **Plain-language controls:** Shape (Square, Wide, Tall, Poster…), Resolution, and under *More controls* Creativity, Planning, Seed, File type and Style notes. Each has a short hint.
-- **Feed:** one row per prompt, with its settings beside the images, plus **Run again**, **Use these settings** and **Delete**. Failed images explain what went wrong and offer **Try again**.
-- **Organize:** every image you've made in one grid. Search by prompt, select with a click (Shift-click for a range), then add the selection to a moodboard or delete it.
+- **Feed:** one row per prompt, with its settings beside the images, plus **Run again**, **Use these settings** and **Delete**. Failed images explain what went wrong and offer **Try again**. Rate limits and dropped connections are retried once on their own.
+- **Viewer:** click an image to see it large with its model, shape, resolution, seed and time, plus **Copy prompt**, **Use these settings**, **Star**, **Edit**, **+ Moodboard** and **Download**. Downloads are named from the prompt and seed, like `fox-reading-a-map_s1234.png`.
+- **Stars:** star the keepers. Delete skips starred images, and Organize can show only them.
+- **Undo:** deleting images or a row shows **Undo** for a few seconds instead of asking first.
+- **Prompt history:** press ↑ and ↓ in an empty prompt to bring back earlier prompts.
+- **While you wait:** the tab title counts images in progress, and when a row finishes in a background tab you get a notification.
+- **Organize:** every image you've made in one grid, with tokens used today and in total. Search by prompt, filter to starred, select with a click (Shift-click for a range), then add the selection to a moodboard, star it or delete it.
 - **Moodboards:** collect images that share a feel, from Organize, from any result with **+ Moodboard**, or by dropping in your own. Pick a moodboard next to the prompt and new images follow its style.
 
-![Four images developing: each holds its place with a WebGL loading tile until the image fades in](docs/loading.png)
+![Three prompts queued at once: the newest row waits in line, the rows below develop behind WebGL loading tiles](docs/loading.png)
 
-![Organize: every generated image in one grid, five selected, with the selection bar to add them to a moodboard](docs/organize.png)
+![The viewer: an image large, with its settings and Copy prompt, Use these settings, Starred, Edit, + Moodboard and Download](docs/lightbox.png)
+
+![Organize: every generated image in one grid with today's token use, five selected, two starred, and the selection bar](docs/organize.png)
 
 ![A moodboard's page: its name, image count, and Generate with this, Add images and Delete](docs/moodboard.png)
 
@@ -37,9 +45,11 @@ Everything runs on your machine. No dependencies beyond Python 3.
 
 ## How it works
 
-`server.py` is a small standard-library server bound to `127.0.0.1`. It serves `index.html` and forwards each run to `https://api.comfy.org/v2/models/<model>`. Your key stays on the server and never reaches the browser.
+`server.py` is a small standard-library server bound to `127.0.0.1`. It serves `index.html` and forwards each image to `https://api.comfy.org/v2/models/<model>`. Your key stays on the server and never reaches the browser.
 
-Each image is saved to `outputs/` with a `.json` file holding the prompt, settings and Router stats (time, token usage, finish reason). The feed rebuilds from that folder on reload. Delete files there to clear it.
+Each image is a task. The page hands tasks to the server and polls `/api/tasks` for progress. Eight worker threads make the Router calls, so no more than 8 images are in flight however many prompts, tabs or reloads ask, and the rest wait in line in the order they came. Change `MAX_ACTIVE` in `server.py` if your account allows more. A 429, 5xx or dropped connection is retried once after a short wait. Finished tasks are kept for 15 minutes so a reloaded page can collect them, and a server restart forgets them.
+
+Each image is saved to `outputs/` with a `.json` file holding the prompt, settings, star and Router stats (time, token usage, finish reason). The feed rebuilds from that folder on reload. Deleting in the app moves files to `outputs/.trash/`, which is emptied of anything older than a day. Delete files in `outputs/` yourself to clear them for good.
 
 The thinking previews the model streams back are dropped. Only the final image is kept.
 
@@ -59,7 +69,7 @@ The labels are friendlier than the API. This is what each one sets on the Router
 
 | In Darkroom | Router field |
 |---|---|
-| Images | number of parallel requests (seed + 0, + 1, …) |
+| Images | number of requests, queued together (seed + 0, + 1, …) |
 | Shape | `imageConfig.aspectRatio` (Auto leaves it unset) |
 | Resolution | `imageConfig.imageSize` |
 | Creativity | `temperature` (Steady 0 to Wild 2, default 1) |
@@ -75,15 +85,17 @@ The images in `docs/` come from `scripts/screenshots.mjs`. Retake them with any 
 ```sh
 npm i --no-save puppeteer-core     # once
 python3 server.py &                # needs a working key
-node scripts/screenshots.mjs       # makes one 4-image run at 1K
+node scripts/screenshots.mjs       # makes three 4-image runs at 1K (12 images)
 ```
 
-Set `CHROME` if Chrome isn't at the default macOS path.
+Set `CHROME` if Chrome isn't in the usual place for your OS. Stars the script adds for the shots are removed again at the end.
 
 ## Notes
 
 - Planning level `LOW` is not offered: Router rejects it for Nano Banana 2.1.
 - Nano Banana (2.5 Flash Image) has one resolution, so Resolution is turned off for it.
+- Cancelling an image that's already developing stops Darkroom waiting for it, but Router still finishes and bills it. It just isn't saved.
+- Token counts are what Router reports for the images on disk. Failed and cancelled images aren't counted.
 - `.env`, `outputs/` and `moodboards/` are gitignored.
 
 ![The first screen: example prompts and tips](docs/welcome.png)
