@@ -204,6 +204,9 @@ kbd { font-family:inherit; font-size:.78rem; font-weight:700; color:var(--warm-w
 /* toast */
 .toast { position:fixed; left:50%; bottom:1.5rem; transform:translate(-50%,1rem); background:var(--warm-white); color:var(--ink); font-weight:400; font-size:.95rem; border-radius:1rem; padding:.7rem 1.1rem; opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; z-index:50; max-width:90vw; }
 .toast.show { opacity:1; transform:translate(-50%,0); }
+.toast.show.act { pointer-events:auto; display:flex; align-items:center; gap:1rem; padding:.45rem .5rem .45rem 1.1rem; }
+.toast button { font-size:.72rem; font-weight:800; text-transform:uppercase; letter-spacing:.05em; border-radius:.75rem; padding:.45rem .75rem; cursor:pointer; border:0; background:var(--ink); color:var(--warm-white); }
+.toast button:hover { background:var(--ink-light); }
 
 /* ---------- tabs + views ---------- */
 .tabs { display:flex; gap:.2rem; }
@@ -600,6 +603,7 @@ function requestFrom(s, prompt) {
 }
 async function generate(req = requestFrom(state.S, ta.value.trim()), inputs = state.inputs, runs = state.S.runs, boardId = state.activeBoard) {
   if (!req.prompt) { ta.focus(); toast('Describe the image first.'); return; }
+  askToNotify();
   const board = boardById(boardId)?.items.length ? boardById(boardId) : null;
   const baseSeed = req.seed === '' || req.seed == null ? Math.floor(Math.random() * 2147483000) : +req.seed;
   const jobId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -699,7 +703,19 @@ function friendlyError(res) {
 }
 
 let toastTimer = 0;
-function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2800); }
+// toast('Saved.') or toast('Deleted 4 images.', { action: 'Undo', onAction }) — with an action it stays up longer.
+function toast(msg, { action, onAction } = {}) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.toggle('act', !!action);
+  if (action) {
+    const b = document.createElement('button'); b.textContent = action;
+    b.onclick = () => { t.classList.remove('show'); onAction(); };
+    t.appendChild(b);
+  }
+  t.classList.add('show'); clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), action ? 8000 : 2800);
+}
 
 
 // ---------- views ----------
@@ -952,21 +968,40 @@ $('#sel-mood').onclick = () => {
   const srcs = [...state.sel].map(f => 'outputs/' + f);
   pickBoard($('#sel-mood'), async (id, name) => { await addImagesTo(srcs, id, name); clearSelection(); });
 };
-$('#sel-del').onclick = async () => {
-  const files = [...state.sel];
-  if (!confirm(`Delete ${files.length === 1 ? 'this image' : `these ${files.length} images`} from disk?`)) return;
+$('#sel-del').onclick = async () => { const files = [...state.sel]; clearSelection(); await deleteImages(files); };
+// Deleting moves images to the server's trash, so a toast can offer Undo instead of asking first.
+async function deleteImages(files) {
+  const snap = new Map(state.jobs.map(j => [j, j.slots.slice()]));
   await Promise.all(files.map(f => fetch('/api/outputs/' + f, { method: 'DELETE' })));
   removeFiles(new Set(files));
-  clearSelection(); renderOrganize();
-  toast(`Deleted ${files.length === 1 ? '1 image' : files.length + ' images'}.`);
-};
-// Drop deleted images from the feed: rows lose those images, empty rows go away.
+  if (state.view === 'organize') renderOrganize();
+  toast(`Deleted ${files.length === 1 ? '1 image' : files.length + ' images'}.`, { action: 'Undo', onAction: () => undoDelete(snap) });
+}
+async function undoDelete(snap) {
+  let back;
+  try { back = new Set((await api('/api/outputs/restore', { files: [...snap.values()].flat().filter(sl => sl.status === 'done').map(sl => sl.item.file) })).items.map(i => i.file)); }
+  catch (err) { return toast('Couldn’t undo: ' + err.message); }
+  // Put rows and images back where they were. Rows made since then stay on top.
+  const fresh = state.jobs.filter(j => !snap.has(j));
+  for (const [job, before] of snap) {
+    const now = job.slots, slots = before.filter(sl => now.includes(sl) || (sl.status === 'done' && back.has(sl.item.file)));
+    if (slots.length !== now.length || !state.jobs.includes(job)) { job.el?.remove(); job.el = null; }
+    job.slots = slots;
+  }
+  state.jobs = [...fresh, ...[...snap.keys()].filter(j => j.slots.length)];
+  state.boards = await fetch('/api/moodboards').then(r => r.json()).catch(() => state.boards);
+  syncMoodButton(); render();
+  if (state.view === 'organize') renderOrganize();
+  if (state.view === 'moodboards') renderBoards();
+  toast(`Restored ${back.size === 1 ? '1 image' : back.size + ' images'}.`);
+}
+// Drop deleted images from the feed: rows lose those images, and rows left with only failed tiles go away.
 function removeFiles(gone) {
   state.jobs = state.jobs.filter(job => {
     const keep = job.slots.filter(s => !(s.status === 'done' && gone.has(s.item.file)));
     if (keep.length === job.slots.length) return true;
     job.el?.remove(); job.el = null; job.slots = keep;
-    return keep.length > 0;
+    return keep.some(s => s.status === 'done' || s.status === 'pending');
   });
   state.boards.forEach(b => { b.items = b.items.filter(i => !gone.has(i.replace(/^outputs\//, ''))); });
   render();
@@ -1082,7 +1117,7 @@ function buildJob(job) {
         <button class="btn" data-a="rerun" title="Same prompt and settings, new seeds"><span class="tc">Run again</span></button>
         <button class="btn" data-a="reuse" title="Load this prompt and settings into the bar above"><span class="tc">Use these settings</span></button>
         <button class="btn quiet" data-a="cancelall" title="Stop the images still waiting or developing" hidden><span class="tc">Cancel</span></button>
-        <button class="btn quiet" data-a="delete" title="Delete these images from disk"><span class="tc">Delete</span></button>
+        <button class="btn quiet" data-a="delete" title="Delete this row's images"><span class="tc">Delete</span></button>
       </div>
     </div>`;
   const imgs = el.querySelector('.imgs');
@@ -1141,6 +1176,8 @@ function fillError(sl) {
 function render() {
   $('#empty').hidden = state.jobs.length > 0;
   ta.placeholder = state.jobs.length ? 'Describe an image, or press ↑ for an earlier prompt' : 'Describe an image';
+  const live = liveSlots().length;
+  document.title = live ? `(${live}) Comfy Darkroom` : 'Comfy Darkroom';
   const feed = $('#feed');
   state.jobs.forEach((job, i) => {
     if (!job.el) buildJob(job);
@@ -1154,9 +1191,30 @@ function render() {
       if (sl.status === 'error') fillError(sl);
       sl.shown = sl.status;
     });
+    const busy = job.slots.some(x => x.status === 'pending');
+    if (job.busy && !busy) notifyDone(job);
+    job.busy = busy;
   });
   while (feed.children.length > state.jobs.length) feed.lastElementChild.remove();
   tick();
+}
+// When a row finishes while Darkroom is in a background tab, say so with a system notification.
+// Permission is asked once, on the first Generate, since browsers only allow it after a click or key.
+const NOTIFY_KEY = 'darkroom-notify-asked';
+function askToNotify() {
+  if (!('Notification' in window) || Notification.permission !== 'default') return;
+  try { if (localStorage.getItem(NOTIFY_KEY)) return; localStorage.setItem(NOTIFY_KEY, '1'); } catch { return; }
+  Notification.requestPermission().then(p => { if (p === 'granted') toast('Darkroom will let you know when images finish in a background tab.'); });
+}
+function notifyDone(job) {
+  if (!document.hidden || !('Notification' in window) || Notification.permission !== 'granted') return;
+  const done = job.slots.filter(x => x.status === 'done').length, failed = job.slots.filter(x => x.status === 'error' && !x.cancelled).length;
+  if (!done && !failed) return;
+  const p = job.settings.prompt || '';
+  const n = new Notification(done ? `${done} image${done > 1 ? 's' : ''} ready` : 'Images failed', {
+    body: (failed && done ? `${failed} failed. ` : '') + (p.length > 90 ? p.slice(0, 88) + '…' : p), tag: job.jobId,
+    icon: job.slots.find(x => x.status === 'done') ? '/outputs/' + job.slots.find(x => x.status === 'done').item.file : undefined });
+  n.onclick = () => { window.focus(); if (state.view !== 'create') go('create'); job.el?.scrollIntoView({ block: 'start' }); n.close(); };
 }
 function tick() {
   liveSlots().forEach(sl => {
@@ -1203,11 +1261,11 @@ $('#feed').onclick = async e => {
       return generate({ ...job.settings, seed: '' }, [{ mime: blob.type, data: url.split(',')[1], url }], state.S.runs, job.settings.moodboard?.id);
     }
     if (a === 'delete') {
+      job.slots.filter(x => x.status === 'pending').forEach(cancelSlot);
       const files = job.slots.filter(x => x.status === 'done').map(x => x.item.file);
-      if (files.length && !confirm(`Delete ${files.length === 1 ? 'this image' : `these ${files.length} images`} from disk?`)) return;
-      await Promise.all(files.map(f => fetch('/api/outputs/' + f, { method: 'DELETE' })));
       job.slots.forEach(x => x.el?.querySelector('canvas.fx') && Shader.remove(x.el.querySelector('canvas.fx')));
-      state.jobs = state.jobs.filter(j => j !== job); job.el.remove(); render();
+      if (files.length) return deleteImages(files);
+      state.jobs = state.jobs.filter(j => j !== job); job.el.remove(); render();   // only failed or cancelled tiles: nothing to undo
       return;
     }
     return;

@@ -245,6 +245,52 @@ def gallery():
     return sorted(items, key=lambda m: m.get("created", 0), reverse=True)
 
 
+# Deleting an image moves it to outputs/.trash so the page can offer Undo. Trash older than a day
+# is cleared on the next delete and when the server starts.
+TRASH_DAYS = 1
+OUTPUT_EXTS = (".png", ".jpg", ".json")
+
+
+def trash_dir():
+    return os.path.join(OUT, ".trash")
+
+
+def empty_old_trash():
+    if not os.path.isdir(trash_dir()):
+        return
+    cutoff = time.time() - TRASH_DAYS * 86400
+    for f in os.listdir(trash_dir()):
+        fp = os.path.join(trash_dir(), f)
+        if os.path.getmtime(fp) < cutoff:
+            os.remove(fp)
+
+
+def trash_output(name):
+    stem = os.path.splitext(os.path.basename(name))[0]
+    os.makedirs(trash_dir(), exist_ok=True)
+    for ext in OUTPUT_EXTS:
+        fp = os.path.join(OUT, stem + ext)
+        if os.path.isfile(fp):
+            dest = os.path.join(trash_dir(), stem + ext)
+            os.replace(fp, dest)
+            os.utime(dest)  # age the trash from when it was deleted, not when it was made
+
+
+def restore_outputs(names):
+    restored = []
+    for name in names:
+        stem = os.path.splitext(os.path.basename(name))[0]
+        for ext in OUTPUT_EXTS:
+            fp = os.path.join(trash_dir(), stem + ext)
+            if os.path.isfile(fp):
+                os.replace(fp, os.path.join(OUT, stem + ext))
+        try:
+            restored.append(json.load(open(os.path.join(OUT, stem + ".json"))))
+        except (OSError, ValueError):
+            pass
+    return 200, {"items": restored}
+
+
 def mb_load():
     try:
         return json.load(open(MB_FILE))
@@ -330,6 +376,8 @@ class H(BaseHTTPRequestHandler):
     def do_POST(self):
         req = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
         m = re.match(r"^/api/moodboards/([\w-]+)(/upload)?$", self.path)
+        if self.path == "/api/outputs/restore":
+            return self._send(*restore_outputs(req.get("files", [])))
         if self.path == "/api/moodboards":
             board = {"id": uuid.uuid4().hex[:10], "name": (req.get("name") or "Untitled moodboard").strip()[:80],
                      "created": time.time(), "updated": time.time(), "items": []}
@@ -353,11 +401,8 @@ class H(BaseHTTPRequestHandler):
         if m:
             return self._send(*cancel(m.group(1)))
         if self.path.startswith("/api/outputs/"):
-            stem = os.path.splitext(os.path.basename(self.path))[0]
-            for ext in (".png", ".jpg", ".json"):
-                fp = os.path.join(OUT, stem + ext)
-                if os.path.isfile(fp):
-                    os.remove(fp)
+            empty_old_trash()
+            trash_output(self.path)
             return self._send(200, {"ok": True})
         m = re.match(r"^/api/moodboards/([\w-]+)$", self.path)
         if m:
@@ -384,6 +429,7 @@ class H(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8765
+    empty_old_trash()
     start_workers()
     print(f"Comfy Darkroom: http://127.0.0.1:{port}")
     ThreadingHTTPServer(("127.0.0.1", port), H).serve_forever()
