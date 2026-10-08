@@ -121,7 +121,10 @@ select { appearance:none; -webkit-appearance:none; cursor:pointer; padding-right
 @media (max-width:900px){ .job { grid-template-columns:1fr; } .brand { display:none; } .top,.feed,.panel { padding-left:1rem; padding-right:1rem; } }
 .imgs { display:grid; grid-template-columns:1fr 1fr; gap:6px; align-content:start; }
 .imgs.n1 { grid-template-columns:1fr; max-width:60%; }
+/* Tall images (9:16, 2:3) sit four across. Fewer than four keep the same width, so sizes match between rows. */
+.imgs.tall { grid-template-columns:repeat(4, minmax(0,1fr)); max-width:none; }
 @media (max-width:900px){ .imgs.n1 { max-width:none; } }
+@media (max-width:640px){ .imgs.tall { grid-template-columns:1fr 1fr; } }
 .cell { position:relative; background:var(--ink-soft); border-radius:.75rem; overflow:hidden; }
 .cell.done { cursor:zoom-in; }
 .cell canvas.fx { position:absolute; inset:0; width:100%; height:100%; display:block; transition:opacity .4s; }
@@ -1134,6 +1137,14 @@ const Shader = (() => {
 // The feed updates in place: each job and slot owns its DOM node, so a finished image
 // backfills its own shader tile without restarting the others.
 const arNum = a => { const [x, y] = (AR[a] || '1/1').split('/').map(Number); return x / y; };
+// Rows of tall images go four across. Auto rows decide once an image has loaded.
+const TALL = .7;
+function isTall(job) {
+  const a = job.settings.aspectRatio;
+  if (a && a !== 'auto') return arNum(a) < TALL;
+  const im = job.slots.map(s => s.el?.querySelector('.img img')).find(i => i?.naturalWidth);
+  return !!im && im.naturalWidth / im.naturalHeight < TALL;
+}
 function chipsFor(job) {
   const s = job.settings;
   const done = job.slots.filter(x => x.status === 'done');
@@ -1221,6 +1232,7 @@ function fillDone(sl, animate) {
   const finish = () => {
     cell.classList.remove('pending'); cell.classList.add('done');
     if (img.naturalWidth) cell.style.aspectRatio = `${img.naturalWidth}/${img.naturalHeight}`;
+    if (img.naturalWidth / img.naturalHeight < TALL) cell.parentElement?.classList.add('tall');
     if (!animate) return;
     requestAnimationFrame(() => wrap.classList.add('in'));
     const fx = cell.querySelector('canvas.fx');
@@ -1254,6 +1266,7 @@ function render() {
     if (!job.el) buildJob(job);
     if (feed.children[i] !== job.el) feed.insertBefore(job.el, feed.children[i] || null);
     job.el.querySelector('.chips').innerHTML = chipsFor(job);
+    job.el.querySelector('.imgs').classList.toggle('tall', isTall(job));
     job.el.querySelector('[data-a="cancelall"]').hidden = !job.slots.some(x => x.status === 'pending');
     job.slots.forEach(sl => {
       if (sl.shown === sl.status) return;
